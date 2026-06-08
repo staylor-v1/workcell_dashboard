@@ -1,0 +1,39 @@
+[brand]
+title = "Microfactory Studio"
+subtitle = "layout · envelope · export"
+mark = "µ"
+
+[defaults]
+activeTab = "summary"
+showFlow = true
+selectedEnvelopeId = "conex-40"
+customEnvelope = { length = 10, width = 4, height = 3 }
+split = 50
+
+[[tabs]]
+id = "summary"
+label = "Summary"
+
+[[tabs]]
+id = "machines"
+label = "Machines"
+
+[[tabs]]
+id = "layout"
+label = "Layout"
+
+[[tabs]]
+id = "envelope"
+label = "Envelope"
+
+[[tabs]]
+id = "flow"
+label = "Flow"
+
+[[tabs]]
+id = "renders"
+label = "Renders"
+
+[[tabs]]
+id = "export"
+label = "Export"

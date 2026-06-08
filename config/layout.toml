@@ -1,0 +1,19 @@
+[[flow_links]]
+from = "prep"
+to = "mold"
+
+[[flow_links]]
+from = "prep"
+to = "pcb"
+
+[[flow_links]]
+from = "mold"
+to = "assembly"
+
+[[flow_links]]
+from = "pcb"
+to = "assembly"
+
+[[flow_links]]
+from = "assembly"
+to = "test"

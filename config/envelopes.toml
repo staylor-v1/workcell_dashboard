@@ -1,0 +1,119 @@
+[[envelopes]]
+id = "conex-40"
+name = "40ft Conex / ISO dry container"
+category = "Intermodal steel container"
+recommendedUse = "Road-transportable linear microfactory with utilities packed along one wall."
+[envelopes.dimensions]
+length = 12.192
+width = 2.438
+height = 2.591
+unit = "m"
+[envelopes.clearDimensions]
+length = 12.03
+width = 2.35
+height = 2.39
+unit = "m"
+[envelopes.cadModel]
+status = "Parametric model created in-app"
+source = "ISO 668 nominal external dimensions; corrugations, corner castings, forklift pockets, double doors, and interior clear volume are generated from dimensions."
+features = ["corrugated steel shell", "corner castings", "rear double doors", "forklift pockets", "interior clearance box"]
+
+[[envelopes]]
+id = "conex-20"
+name = "20ft Conex / ISO dry container"
+category = "Intermodal steel container"
+recommendedUse = "Pilot-cell deployment, field service lab, training cell, or compact single-product line."
+[envelopes.dimensions]
+length = 6.058
+width = 2.438
+height = 2.591
+unit = "m"
+[envelopes.clearDimensions]
+length = 5.9
+width = 2.35
+height = 2.39
+unit = "m"
+[envelopes.cadModel]
+status = "Parametric model created in-app"
+source = "ISO 668 nominal external dimensions with generated Conex details scaled to 20ft length."
+features = ["corrugated steel shell", "corner castings", "single-end cargo doors", "tie-down rails", "interior clearance box"]
+
+[[envelopes]]
+id = "high-cube-40"
+name = "40ft High-Cube Conex"
+category = "Tall intermodal steel container"
+recommendedUse = "Robotics, overhead conveyors, air handling, mezzanine service racks, and taller safety guarding."
+[envelopes.dimensions]
+length = 12.192
+width = 2.438
+height = 2.896
+unit = "m"
+[envelopes.clearDimensions]
+length = 12.03
+width = 2.35
+height = 2.69
+unit = "m"
+[envelopes.cadModel]
+status = "Parametric model created in-app"
+source = "High-cube variant of ISO Series 1 envelope; extra height is modeled as a taller corrugated sidewall."
+features = ["high-cube roof line", "corrugated walls", "corner castings", "overhead utility raceway allowance"]
+
+[[envelopes]]
+id = "modular-skid"
+name = "Skid-mounted modular cleanroom pod"
+category = "Panelized microfactory pod"
+recommendedUse = "GMP-style assembly, controlled humidity, local HEPA plenum, or precision electronics work."
+[envelopes.dimensions]
+length = 9.0
+width = 3.6
+height = 3.2
+unit = "m"
+[envelopes.clearDimensions]
+length = 8.6
+width = 3.2
+height = 2.85
+unit = "m"
+[envelopes.cadModel]
+status = "Parametric model created in-app"
+source = "Created from typical panelized cleanroom module constraints rather than a single vendor CAD download."
+features = ["insulated wall panels", "flush personnel door", "service chase", "HEPA ceiling modules", "skid base"]
+
+[[envelopes]]
+id = "deployable-shelter"
+name = "Expandable field shelter"
+category = "Deployable structure"
+recommendedUse = "Rapid-response repair cell, military or disaster-relief production, and temporary factory deployment."
+[envelopes.dimensions]
+length = 6.1
+width = 5.6
+height = 2.8
+unit = "m"
+[envelopes.clearDimensions]
+length = 5.8
+width = 5.2
+height = 2.45
+unit = "m"
+[envelopes.cadModel]
+status = "Parametric model created in-app"
+source = "Generated from common expandable shelter proportions with hinged side bays and leveling feet."
+features = ["fold-out side bays", "leveling jacks", "soft utility vestibule", "ribbed roof panels"]
+
+[[envelopes]]
+id = "custom"
+name = "Custom envelope"
+category = "User-defined"
+recommendedUse = "Specify exact length, width, and height for a building bay, trailer, tent, pod, or custom fabrication."
+[envelopes.dimensions]
+length = 10.0
+width = 4.0
+height = 3.0
+unit = "m"
+[envelopes.clearDimensions]
+length = 9.6
+width = 3.6
+height = 2.7
+unit = "m"
+[envelopes.cadModel]
+status = "Generated from user dimensions"
+source = "Created as a neutral rectangular CAD envelope with optional wall thickness and service openings."
+features = ["custom dimension shell", "editable wall thickness", "service openings", "interior keep-out volume"]

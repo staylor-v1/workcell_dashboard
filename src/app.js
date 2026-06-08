@@ -1,22 +1,11 @@
 import { designMetrics, designYaml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, renderBoardSvg, renderPrompt, reportPdf } from './data.js';
 
-const tabs = [
-  { id: 'summary', label: 'Summary' },
-  { id: 'machines', label: 'Machines' },
-  { id: 'layout', label: 'Layout' },
-  { id: 'envelope', label: 'Envelope' },
-  { id: 'flow', label: 'Flow' },
-  { id: 'renders', label: 'Renders' },
-  { id: 'export', label: 'Export' },
-];
+const tabs = factoryDesign.ui.tabs;
 
 const appState = {
-  activeTab: 'summary',
-  showFlow: true,
+  ...factoryDesign.ui.defaults,
   selectedMachineId: factoryDesign.machines[0].id,
-  selectedEnvelopeId: 'conex-40',
-  customEnvelope: { length: 10, width: 4, height: 3 },
-  split: 50,
+  customEnvelope: { ...factoryDesign.ui.defaults.customEnvelope },
 };
 
 const getMachine = (id) => factoryDesign.machines.find((machine) => machine.id === id) ?? factoryDesign.machines[0];
@@ -397,7 +386,7 @@ function view() {
 
   return `
     <header class="app-header">
-      <div class="brand"><div class="brand-mark">µ</div><div><strong>Microfactory Studio</strong><span>layout · envelope · export</span></div></div>
+      <div class="brand"><div class="brand-mark">${factoryDesign.ui.brand.mark}</div><div><strong>${factoryDesign.ui.brand.title}</strong><span>${factoryDesign.ui.brand.subtitle}</span></div></div>
       <nav class="tabs" aria-label="Primary views">
         ${tabs.map((tab) => `<button class="tab ${appState.activeTab === tab.id ? 'active' : ''}" data-tab-target="${tab.id}">${tab.label}</button>`).join('')}
       </nav>
