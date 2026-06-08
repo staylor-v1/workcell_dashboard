@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { factoryDesign, designMetrics, renderPrompt } from '../src/data.js';
 import { flowGraph, layoutSvg, tabs } from '../src/app.js';
 
@@ -29,4 +30,15 @@ test('render profiles produce photorealistic prompts from the shared design', ()
   const prompt = renderPrompt(factoryDesign.renderProfiles[0]);
   assert.match(prompt, /Photorealistic industrial microfactory render/);
   assert.match(prompt, /24m x 14m scale/);
+});
+
+test('browser entrypoint loads stylesheet from HTML and keeps JavaScript browser-safe', async () => {
+  const [html, main] = await Promise.all([
+    readFile('index.html', 'utf8'),
+    readFile('src/main.js', 'utf8'),
+  ]);
+
+  assert.match(html, /<title>Microfactory Studio<\/title>/);
+  assert.match(html, /<link rel="stylesheet" href="\/src\/styles\.css" \/>/);
+  assert.doesNotMatch(main, /import\s+['"].*\.css['"]/);
 });
