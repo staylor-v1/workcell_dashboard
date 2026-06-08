@@ -160,3 +160,43 @@ dd { margin: .2rem 0 0; line-height: 1.5; }
   .flow-split { grid-template-columns: 1fr !important; }
   .flow-graph { grid-template-columns: 1fr; }
 }
+
+.envelope-boundary { fill: rgba(62, 231, 198, .055); stroke: rgba(62, 231, 198, .85); stroke-width: 3; stroke-dasharray: 12 8; }
+.envelope-label { fill: var(--accent); font-size: 13px; font-weight: 900; }
+.envelope-view > p, .export-view > p { max-width: 980px; color: var(--muted); font-size: 1.02rem; }
+.envelope-grid, .export-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-top: 1.2rem; }
+.envelope-card, .export-card { border: 1px solid var(--line); border-radius: 24px; padding: 1rem; background: rgba(2, 6, 23, .38); cursor: pointer; transition: border-color .2s ease, transform .2s ease, background .2s ease; }
+.envelope-card:hover, .export-card:hover { transform: translateY(-2px); border-color: rgba(62,231,198,.45); }
+.envelope-card.selected { background: linear-gradient(160deg, rgba(62,231,198,.16), rgba(134,168,255,.09)); border-color: var(--accent); }
+.envelope-card__top { display: flex; justify-content: space-between; gap: .8rem; align-items: flex-start; color: var(--muted); font-size: .78rem; }
+.envelope-card__top strong { color: var(--accent); text-align: right; }
+.envelope-card h3, .export-card h3 { margin: .7rem 0 .45rem; }
+.envelope-card p, .export-card p { color: var(--muted); line-height: 1.5; }
+.envelope-card small, .export-card small { color: var(--accent); font-weight: 800; }
+.envelope-detail { display: grid; grid-template-columns: minmax(300px, .9fr) minmax(360px, 1.1fr); gap: 1rem; margin-top: 1rem; align-items: stretch; }
+.envelope-detail > div, .cad-preview, .export-summary, .export-manifest { border: 1px solid var(--line); border-radius: 28px; background: rgba(2,6,23,.38); padding: 1.2rem; }
+.envelope-specs { margin: 1rem 0; }
+.feature-list { display: flex; flex-wrap: wrap; gap: .55rem; padding: 0; list-style: none; }
+.feature-list li { border: 1px solid rgba(62,231,198,.25); border-radius: 999px; padding: .42rem .7rem; color: var(--accent); background: rgba(62,231,198,.08); font-weight: 800; font-size: .82rem; }
+.custom-dimensions { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; margin-top: 1rem; }
+.custom-dimensions.is-hidden { display: none; }
+.custom-dimensions label { display: grid; gap: .35rem; color: var(--muted); font-weight: 800; }
+.custom-dimensions input { border: 1px solid rgba(148,163,184,.28); border-radius: 14px; padding: .7rem; color: var(--text); background: rgba(2,6,23,.55); }
+.cad-preview { width: 100%; min-height: 420px; padding: 0; }
+.cad-top { fill: rgba(134,168,255,.22); stroke: rgba(148,163,184,.65); stroke-width: 2; }
+.cad-side { fill: url(#cad-shell); stroke: rgba(153,246,228,.65); stroke-width: 2; }
+.cad-end { fill: rgba(15,23,42,.86); stroke: rgba(148,163,184,.65); stroke-width: 2; }
+.cad-ribs line { stroke: rgba(153,246,228,.35); stroke-width: 3; }
+.cad-door { fill: rgba(2,6,23,.45); stroke: rgba(255,255,255,.45); stroke-width: 2; }
+.cad-preview text { fill: var(--text); font: 700 20px system-ui; }
+.export-summary { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin: 1rem 0; }
+.export-summary strong { color: var(--accent); }
+.export-summary span { color: var(--muted); }
+.export-card { cursor: default; display: grid; gap: .8rem; }
+.export-card button { justify-self: start; }
+.export-manifest { margin-top: 1rem; }
+.export-manifest pre { white-space: pre-wrap; color: #cbd5e1; background: rgba(15,23,42,.65); border-radius: 18px; padding: 1rem; overflow: auto; }
+
+@media (max-width: 920px) {
+  .envelope-grid, .export-grid, .envelope-detail, .custom-dimensions { grid-template-columns: 1fr; }
+}

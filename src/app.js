@@ -1,21 +1,36 @@
-import { factoryDesign, designMetrics, renderPrompt } from './data.js';
+import { designMetrics, designYaml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, renderBoardSvg, renderPrompt, reportPdf } from './data.js';
 
 const tabs = [
   { id: 'summary', label: 'Summary' },
   { id: 'machines', label: 'Machines' },
   { id: 'layout', label: 'Layout' },
+  { id: 'envelope', label: 'Envelope' },
   { id: 'flow', label: 'Flow' },
   { id: 'renders', label: 'Renders' },
+  { id: 'export', label: 'Export' },
 ];
 
 const appState = {
   activeTab: 'summary',
   showFlow: true,
   selectedMachineId: factoryDesign.machines[0].id,
+  selectedEnvelopeId: 'conex-40',
+  customEnvelope: { length: 10, width: 4, height: 3 },
   split: 50,
 };
 
 const getMachine = (id) => factoryDesign.machines.find((machine) => machine.id === id) ?? factoryDesign.machines[0];
+
+const selectedEnvelope = () => {
+  const envelope = getEnvelope(appState.selectedEnvelopeId);
+  if (envelope.id !== 'custom') return envelope;
+  const { length, width, height } = appState.customEnvelope;
+  return {
+    ...envelope,
+    dimensions: { length, width, height, unit: 'm' },
+    clearDimensions: { length: Math.max(length - 0.4, 0), width: Math.max(width - 0.4, 0), height: Math.max(height - 0.3, 0), unit: 'm' },
+  };
+};
 
 function machineCard(machine, compact = false) {
   const params = machine.parameters
@@ -41,8 +56,9 @@ function machineCard(machine, compact = false) {
 function layoutSvg({ compact = false } = {}) {
   const width = 640;
   const height = 380;
-  const scaleX = width / factoryDesign.floorSize.width;
-  const scaleY = height / factoryDesign.floorSize.height;
+  const envelope = selectedEnvelope();
+  const scaleX = width / Math.max(factoryDesign.floorSize.width, envelope.dimensions.length);
+  const scaleY = height / Math.max(factoryDesign.floorSize.height, envelope.dimensions.width);
   const machines = factoryDesign.machines
     .map((machine) => {
       const { x, y, w, h } = machine.footprint;
@@ -79,6 +95,8 @@ function layoutSvg({ compact = false } = {}) {
         </defs>
         <rect width="${width}" height="${height}" rx="24" fill="url(#floor-grid)" />
         <rect x="18" y="18" width="${width - 36}" height="${height - 36}" rx="20" class="floor-boundary" />
+        <rect x="0" y="0" width="${envelope.dimensions.length * scaleX}" height="${envelope.dimensions.width * scaleY}" rx="18" class="envelope-boundary" />
+        <text x="24" y="34" class="envelope-label">${envelope.name}</text>
         ${flows}
         ${machines}
       </svg>
@@ -138,7 +156,7 @@ function renderSummary() {
       <div>
         <span class="eyebrow">Factory design workspace</span>
         <h1>${factoryDesign.name}</h1>
-        <p>Design a compact microfactory from machine parameters to layout, material movement, process transformations, and render direction.</p>
+        <p>Design a compact microfactory from machine parameters to layout, material movement, process transformations, envelope CAD, export packages, and render direction.</p>
       </div>
       <div class="hero-product">
         <span>${factoryDesign.product}</span>
@@ -248,18 +266,138 @@ function renderRenders() {
     </section>`;
 }
 
+
+function envelopeCadSvg(envelope = selectedEnvelope()) {
+  const length = envelope.dimensions.length;
+  const width = envelope.dimensions.width;
+  const height = envelope.dimensions.height;
+  const iso = envelope.id.includes('conex') || envelope.id.includes('cube');
+  const ribs = Array.from({ length: 12 }, (_, index) => `<line x1="${96 + index * 48}" y1="122" x2="${126 + index * 48}" y2="264" />`).join('');
+  const sideBays = envelope.id === 'deployable-shelter' ? '<polygon points="98,176 28,222 76,296 146,252"/><polygon points="600,176 672,222 624,296 552,252"/>' : '';
+
+  return `
+    <svg class="cad-preview" viewBox="0 0 720 420" role="img" aria-label="CAD preview for ${envelope.name}">
+      <defs>
+        <linearGradient id="cad-shell" x1="0" x2="1"><stop stop-color="#1e293b"/><stop offset="1" stop-color="#0f766e"/></linearGradient>
+      </defs>
+      <polygon class="cad-top" points="116,94 574,94 652,152 196,152" />
+      <polygon class="cad-side" points="196,152 652,152 652,284 196,284" />
+      <polygon class="cad-end" points="116,94 196,152 196,284 116,224" />
+      ${sideBays}
+      <g class="cad-ribs">${iso ? ribs : ''}</g>
+      <rect class="cad-door" x="596" y="172" width="38" height="92" rx="4" />
+      <text x="70" y="350">${length}m L × ${width}m W × ${height}m H</text>
+      <text x="70" y="382">${envelope.cadModel.status}</text>
+    </svg>`;
+}
+
+function renderEnvelope() {
+  const envelope = selectedEnvelope();
+  return `
+    <section class="workspace envelope-view">
+      <div class="panel-heading large">
+        <div><span class="eyebrow">Factory container</span><h1>Envelope and CAD model selection</h1></div>
+        <button data-tab-target="export">Export selected envelope</button>
+      </div>
+      <p>Choose the physical container for the microfactory. Default options include researched ISO container envelopes and generated parametric CAD structures that can be exported with the full factory package.</p>
+      <div class="envelope-grid">
+        ${factoryDesign.envelopeOptions.map((option) => `
+          <article class="envelope-card ${option.id === appState.selectedEnvelopeId ? 'selected' : ''}" data-envelope-id="${option.id}">
+            <div class="envelope-card__top"><span>${option.category}</span><strong>${option.dimensions.length} × ${option.dimensions.width} × ${option.dimensions.height} m</strong></div>
+            <h3>${option.name}</h3>
+            <p>${option.recommendedUse}</p>
+            <small>CAD: ${option.cadModel.status}</small>
+          </article>`).join('')}
+      </div>
+      <section class="envelope-detail">
+        <div>
+          <span class="eyebrow">Selected CAD envelope</span>
+          <h2>${envelope.name}</h2>
+          <dl class="envelope-specs">
+            <div><dt>External size</dt><dd>${envelope.dimensions.length}m × ${envelope.dimensions.width}m × ${envelope.dimensions.height}m</dd></div>
+            <div><dt>Clear size</dt><dd>${envelope.clearDimensions.length}m × ${envelope.clearDimensions.width}m × ${envelope.clearDimensions.height}m</dd></div>
+            <div><dt>Volume</dt><dd>${envelopeVolume(envelope)} m³ gross</dd></div>
+            <div><dt>Model basis</dt><dd>${envelope.cadModel.source}</dd></div>
+          </dl>
+          <ul class="feature-list">${envelope.cadModel.features.map((feature) => `<li>${feature}</li>`).join('')}</ul>
+          <div class="custom-dimensions ${appState.selectedEnvelopeId === 'custom' ? '' : 'is-hidden'}">
+            <label>Length (m)<input type="number" min="1" step="0.1" data-custom-dimension="length" value="${appState.customEnvelope.length}" /></label>
+            <label>Width (m)<input type="number" min="1" step="0.1" data-custom-dimension="width" value="${appState.customEnvelope.width}" /></label>
+            <label>Height (m)<input type="number" min="1" step="0.1" data-custom-dimension="height" value="${appState.customEnvelope.height}" /></label>
+          </div>
+        </div>
+        ${envelopeCadSvg(envelope)}
+      </section>
+    </section>`;
+}
+
+function exportCard(pkg) {
+  const envelope = selectedEnvelope();
+  return `<article class="export-card">
+    <div><span class="eyebrow">${pkg.extension}</span><h3>${pkg.label}</h3></div>
+    <p>${pkg.detail}</p>
+    <button data-export-kind="${pkg.id}">Download ${pkg.extension}</button>
+    <small>Configured for ${envelope.name}</small>
+  </article>`;
+}
+
+function renderExport() {
+  const envelope = selectedEnvelope();
+  return `
+    <section class="workspace export-view">
+      <span class="eyebrow">Design handoff</span>
+      <h1>Export the whole factory package</h1>
+      <p>Generate neutral CAD, source YAML, photorealistic render boards, and a PDF report from the shared machine, flow, render, and envelope model.</p>
+      <aside class="export-summary">
+        <strong>${factoryDesign.name}</strong>
+        <span>${envelope.name}</span>
+        <span>${factoryDesign.machines.length} machines · ${factoryDesign.renderProfiles.length} render briefs · ${factoryDesign.flowLinks.length} flow links</span>
+      </aside>
+      <div class="export-grid">${factoryDesign.exportPackages.map(exportCard).join('')}</div>
+      <div class="export-manifest">
+        <h2>Package manifest</h2>
+        <pre>${designYaml({ envelope }).split('\n').slice(0, 18).join('\n')}\n...</pre>
+      </div>
+    </section>`;
+}
+
+function downloadText(filename, contents, type) {
+  const blob = new Blob([contents], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function handleExport(kind) {
+  const envelope = selectedEnvelope();
+  const slug = factoryDesign.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const exporters = {
+    step: [`${slug}.step`, factoryStep({ envelope }), 'model/step'],
+    yaml: [`${slug}.yaml`, designYaml({ envelope }), 'text/yaml'],
+    images: [`${slug}-render-board.svg`, renderBoardSvg({ envelope }), 'image/svg+xml'],
+    pdf: [`${slug}-report.pdf`, reportPdf({ envelope }), 'application/pdf'],
+  };
+  const file = exporters[kind];
+  if (file) downloadText(...file);
+}
+
 function view() {
   const content = {
     summary: renderSummary,
     machines: renderMachines,
     layout: renderLayout,
+    envelope: renderEnvelope,
     flow: renderFlow,
     renders: renderRenders,
+    export: renderExport,
   }[appState.activeTab]();
 
   return `
     <header class="app-header">
-      <div class="brand"><div class="brand-mark">µ</div><div><strong>Microfactory Studio</strong><span>layout · flow · renders</span></div></div>
+      <div class="brand"><div class="brand-mark">µ</div><div><strong>Microfactory Studio</strong><span>layout · envelope · export</span></div></div>
       <nav class="tabs" aria-label="Primary views">
         ${tabs.map((tab) => `<button class="tab ${appState.activeTab === tab.id ? 'active' : ''}" data-tab-target="${tab.id}">${tab.label}</button>`).join('')}
       </nav>
@@ -286,13 +424,22 @@ export function bindApp(root = document.querySelector('#root')) {
       return;
     }
 
-    const target = event.target.closest('[data-tab-target], [data-machine-id]');
+    const exportTarget = event.target.closest('[data-export-kind]');
+    if (exportTarget) {
+      handleExport(exportTarget.dataset.exportKind);
+      return;
+    }
+
+    const target = event.target.closest('[data-tab-target], [data-machine-id], [data-envelope-id]');
     if (!target) return;
     if (target.dataset.tabTarget) {
       appState.activeTab = target.dataset.tabTarget;
     }
     if (target.dataset.machineId) {
       appState.selectedMachineId = target.dataset.machineId;
+    }
+    if (target.dataset.envelopeId) {
+      appState.selectedEnvelopeId = target.dataset.envelopeId;
     }
     renderApp(root);
   });
@@ -309,7 +456,11 @@ export function bindApp(root = document.querySelector('#root')) {
       appState.split = Number(event.target.value);
       renderApp(root);
     }
+    if (event.target.dataset.customDimension) {
+      appState.customEnvelope[event.target.dataset.customDimension] = Number(event.target.value);
+      renderApp(root);
+    }
   });
 }
 
-export { appState, tabs, layoutSvg, flowGraph };
+export { appState, tabs, layoutSvg, flowGraph, renderEnvelope, renderExport, envelopeCadSvg };

@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { factoryDesign, designMetrics, renderPrompt } from '../src/data.js';
-import { flowGraph, layoutSvg, tabs } from '../src/app.js';
+import { designYaml, factoryDesign, factoryStep, designMetrics, renderBoardSvg, renderPrompt, reportPdf } from '../src/data.js';
+import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, tabs } from '../src/app.js';
 
 test('factory design contains required coordinated views', () => {
-  assert.deepEqual(tabs.map((tab) => tab.id), ['summary', 'machines', 'layout', 'flow', 'renders']);
+  assert.deepEqual(tabs.map((tab) => tab.id), ['summary', 'machines', 'layout', 'envelope', 'flow', 'renders', 'export']);
   assert.equal(factoryDesign.machines.length, 5);
   assert.equal(factoryDesign.flow.length, 5);
+  assert.equal(factoryDesign.envelopeOptions.length, 6);
 });
 
 test('design metrics identify the bottleneck from shared machine data', () => {
@@ -41,4 +42,33 @@ test('browser entrypoint loads stylesheet from HTML and keeps JavaScript browser
   assert.match(html, /<title>Microfactory Studio<\/title>/);
   assert.match(html, /<link rel="stylesheet" href="\/src\/styles\.css" \/>/);
   assert.doesNotMatch(main, /import\s+['"].*\.css['"]/);
+});
+
+
+test('envelope tab provides researched defaults, custom dimensions, and CAD previews', () => {
+  const envelopeMarkup = renderEnvelope();
+  const cadMarkup = envelopeCadSvg(factoryDesign.envelopeOptions[0]);
+
+  assert.match(envelopeMarkup, /40ft Conex \/ ISO dry container/);
+  assert.match(envelopeMarkup, /20ft Conex \/ ISO dry container/);
+  assert.match(envelopeMarkup, /Custom envelope/);
+  assert.match(envelopeMarkup, /data-custom-dimension="length"/);
+  assert.match(cadMarkup, /CAD preview for 40ft Conex/);
+});
+
+test('export tab generates STEP, YAML, render-board SVG, and PDF package content', () => {
+  const exportMarkup = renderExport();
+  const step = factoryStep();
+  const yaml = designYaml();
+  const svg = renderBoardSvg();
+  const pdf = reportPdf();
+
+  assert.match(exportMarkup, /Download \.step/);
+  assert.match(exportMarkup, /Download \.yaml/);
+  assert.match(exportMarkup, /Download \.svg/);
+  assert.match(exportMarkup, /Download \.pdf/);
+  assert.match(step, /ISO-10303-21/);
+  assert.match(yaml, /envelope:/);
+  assert.match(svg, /Photorealistic render board/);
+  assert.match(pdf, /%PDF-1\.4/);
 });
