@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { factoryDesign, designMetrics, renderPrompt } from '../src/data.js';
-import { flowGraph, layoutSvg, tabs } from '../src/app.js';
+import { factoryDesign, machineLibrary, designMetrics, renderPrompt } from '../src/data.js';
+import { appState, flowGraph, layoutSvg, placeLibraryMachine, tabs } from '../src/app.js';
 
 test('factory design contains required coordinated views', () => {
   assert.deepEqual(tabs.map((tab) => tab.id), ['summary', 'machines', 'layout', 'flow', 'renders']);
@@ -29,4 +29,25 @@ test('render profiles produce photorealistic prompts from the shared design', ()
   const prompt = renderPrompt(factoryDesign.renderProfiles[0]);
   assert.match(prompt, /Photorealistic industrial microfactory render/);
   assert.match(prompt, /24m x 14m scale/);
+});
+
+
+test('layout view offers a researched drag-and-drop machine palette', () => {
+  const categories = new Set(machineLibrary.map((machine) => machine.category));
+  assert.ok(categories.has('Metal 3D Printer'));
+  assert.ok(categories.has('Wire EDM'));
+  assert.ok(categories.has('CNC Mill'));
+  assert.match(machineLibrary.map((machine) => machine.name).join(' | '), /Markforged Metal X/);
+  assert.match(machineLibrary.map((machine) => machine.name).join(' | '), /Sodick ALN400G/);
+  assert.match(machineLibrary.map((machine) => machine.name).join(' | '), /Haas Mini Mill/);
+});
+
+test('machines from the palette can be placed onto the layout model', () => {
+  const initialCount = appState.layoutMachines.length;
+  assert.equal(placeLibraryMachine('haas-mini-mill', 30, 30), true);
+  assert.equal(appState.layoutMachines.length, initialCount + 1);
+  const placed = appState.layoutMachines.at(-1);
+  assert.equal(placed.name, 'Haas Mini Mill');
+  assert.equal(placed.footprint.x <= factoryDesign.floorSize.width - placed.footprint.w - 0.6, true);
+  assert.match(layoutSvg(), /Haas/);
 });
