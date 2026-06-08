@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { factoryDesign, machineLibrary, designMetrics, renderPrompt } from '../src/data.js';
+import { appState, flowGraph, layoutSvg, placeLibraryMachine, resetLayoutMachines, tabs } from '../src/app.js';
 import { readFile } from 'node:fs/promises';
-import { factoryDesign, designMetrics, renderPrompt } from '../src/data.js';
 import { flowGraph, layoutSvg, tabs } from '../src/app.js';
 
 test('factory design contains required coordinated views', () => {
@@ -32,6 +33,28 @@ test('render profiles produce photorealistic prompts from the shared design', ()
   assert.match(prompt, /24m x 14m scale/);
 });
 
+
+test('layout view offers a researched drag-and-drop machine palette', () => {
+  const categories = new Set(machineLibrary.map((machine) => machine.category));
+  assert.ok(categories.has('Metal 3D Printer'));
+  assert.ok(categories.has('Wire EDM'));
+  assert.ok(categories.has('CNC Mill'));
+  assert.match(machineLibrary.map((machine) => machine.name).join(' | '), /Markforged Metal X/);
+  assert.match(machineLibrary.map((machine) => machine.name).join(' | '), /Sodick ALN400G/);
+  assert.match(machineLibrary.map((machine) => machine.name).join(' | '), /Haas Mini Mill/);
+});
+
+test('machines from the palette can be placed onto the layout model', () => {
+  resetLayoutMachines();
+  const initialCount = appState.layoutMachines.length;
+  assert.equal(placeLibraryMachine('haas-mini-mill', 30, 30), true);
+  assert.equal(appState.layoutMachines.length, initialCount + 1);
+  const placed = appState.layoutMachines.at(-1);
+  assert.equal(placed.id, 'haas-mini-mill-1');
+  assert.equal(placed.name, 'Haas Mini Mill');
+  assert.equal(placed.footprint.x <= factoryDesign.floorSize.width - placed.footprint.w - 0.6, true);
+  assert.match(layoutSvg(), /Haas/);
+  resetLayoutMachines();
 test('browser entrypoint loads stylesheet from HTML and keeps JavaScript browser-safe', async () => {
   const [html, main] = await Promise.all([
     readFile('index.html', 'utf8'),

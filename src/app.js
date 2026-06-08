@@ -1,4 +1,4 @@
-import { factoryDesign, designMetrics, renderPrompt } from './data.js';
+import { factoryDesign, machineLibrary, designMetrics, renderPrompt } from './data.js';
 
 const tabs = [
   { id: 'summary', label: 'Summary' },
@@ -8,14 +8,69 @@ const tabs = [
   { id: 'renders', label: 'Renders' },
 ];
 
+const baselineLayoutMachines = () => factoryDesign.machines.map((machine) => ({ ...machine, source: 'Baseline factory model' }));
+
 const appState = {
   activeTab: 'summary',
   showFlow: true,
   selectedMachineId: factoryDesign.machines[0].id,
+  layoutMachines: baselineLayoutMachines(),
+  placedMachineSequence: 0,
   split: 50,
 };
 
-const getMachine = (id) => factoryDesign.machines.find((machine) => machine.id === id) ?? factoryDesign.machines[0];
+const getMachine = (id) =>
+  appState.layoutMachines.find((machine) => machine.id === id) ??
+  factoryDesign.machines.find((machine) => machine.id === id) ??
+  appState.layoutMachines[0];
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+function machineFromLibrary(libraryId, instanceNumber, x = 1.2, y = 1.2) {
+  const asset = machineLibrary.find((machine) => machine.id === libraryId);
+  if (!asset) return null;
+  const footprint = {
+    x: clamp(x, 0.6, factoryDesign.floorSize.width - asset.footprint.w - 0.6),
+    y: clamp(y, 0.6, factoryDesign.floorSize.height - asset.footprint.h - 0.6),
+    w: asset.footprint.w,
+    h: asset.footprint.h,
+  };
+
+  return {
+    id: `${asset.id}-${instanceNumber}`,
+    libraryId: asset.id,
+    name: asset.name,
+    type: asset.category,
+    status: 'Planned',
+    operator: 'Configure after placement',
+    cycleTime: asset.cycleTime,
+    uptime: 95,
+    energy: asset.energy,
+    footprint,
+    inputs: asset.inputs,
+    outputs: asset.outputs,
+    parameters: asset.parameters,
+    source: asset.source,
+    sourceUrl: asset.sourceUrl,
+    why: asset.why,
+  };
+}
+
+function placeLibraryMachine(libraryId, x, y) {
+  const instanceNumber = appState.placedMachineSequence + 1;
+  const machine = machineFromLibrary(libraryId, instanceNumber, x, y);
+  if (!machine) return false;
+  appState.placedMachineSequence = instanceNumber;
+  appState.layoutMachines = [...appState.layoutMachines, machine];
+  appState.selectedMachineId = machine.id;
+  return true;
+}
+
+function resetLayoutMachines() {
+  appState.layoutMachines = baselineLayoutMachines();
+  appState.placedMachineSequence = 0;
+  appState.selectedMachineId = factoryDesign.machines[0].id;
+}
 
 function machineCard(machine, compact = false) {
   const params = machine.parameters
@@ -43,7 +98,7 @@ function layoutSvg({ compact = false } = {}) {
   const height = 380;
   const scaleX = width / factoryDesign.floorSize.width;
   const scaleY = height / factoryDesign.floorSize.height;
-  const machines = factoryDesign.machines
+  const machines = appState.layoutMachines
     .map((machine) => {
       const { x, y, w, h } = machine.footprint;
       const selected = machine.id === appState.selectedMachineId ? ' selected' : '';
@@ -190,20 +245,40 @@ function renderMachines() {
     </section>`;
 }
 
+function machinePaletteCard(machine) {
+  return `
+    <button class="palette-card" draggable="true" data-library-machine-id="${machine.id}" aria-label="Drag ${machine.name} onto the layout">
+      <span class="palette-card__category">${machine.category}</span>
+      <strong>${machine.name}</strong>
+      <small>${machine.type}</small>
+      <p>${machine.why}</p>
+      <span class="palette-card__source">Source: ${machine.source}</span>
+    </button>`;
+}
+
 function renderLayout() {
   const selected = getMachine(appState.selectedMachineId);
   return `
-    <section class="workspace">
-      <div class="panel-heading large">
-        <div><span class="eyebrow">Top-down layout</span><h1>Machine placement and product movement</h1></div>
-        <label class="switch"><input type="checkbox" id="flowToggle" ${appState.showFlow ? 'checked' : ''} /> <span>Show product flow</span></label>
-      </div>
-      ${layoutSvg()}
-      <aside class="layout-inspector">
-        <strong>${selected.name}</strong>
-        <span>${selected.type}</span>
-        <p>${selected.inputs.join(' + ')} → ${selected.outputs.join(' + ')}</p>
+    <section class="workspace layout-workspace">
+      <aside class="machine-palette" aria-label="Potential machines">
+        <span class="eyebrow">Machine menu</span>
+        <h2>Drag machines onto the layout</h2>
+        <p>Popular microfactory-ready assets researched from compact metal additive, wire EDM, and CNC milling product families.</p>
+        <div class="palette-list">${machineLibrary.map((machine) => machinePaletteCard(machine)).join('')}</div>
       </aside>
+      <div class="layout-stage">
+        <div class="panel-heading large">
+          <div><span class="eyebrow">Top-down layout</span><h1>Machine placement and product movement</h1></div>
+          <label class="switch"><input type="checkbox" id="flowToggle" ${appState.showFlow ? 'checked' : ''} /> <span>Show product flow</span></label>
+        </div>
+        <div data-layout-dropzone="true">${layoutSvg()}</div>
+        <aside class="layout-inspector">
+          <strong>${selected.name}</strong>
+          <span>${selected.type}</span>
+          <p>${selected.inputs.join(' + ')} → ${selected.outputs.join(' + ')}</p>
+          ${selected.source ? `<small>Source: ${selected.sourceUrl ? `<a href="${selected.sourceUrl}" target="_blank" rel="noreferrer">${selected.source}</a>` : selected.source}</small>` : ''}
+        </aside>
+      </div>
     </section>`;
 }
 
@@ -274,6 +349,35 @@ export function renderApp(root = document.querySelector('#root')) {
 
 export function bindApp(root = document.querySelector('#root')) {
   if (!root) return;
+  root.addEventListener('dragstart', (event) => {
+    const card = event.target.closest('[data-library-machine-id]');
+    if (!card) return;
+    event.dataTransfer?.setData('text/plain', card.dataset.libraryMachineId);
+    event.dataTransfer?.setData('application/x-machine-library-id', card.dataset.libraryMachineId);
+  });
+
+  root.addEventListener('dragover', (event) => {
+    if (event.target.closest('[data-layout-dropzone]')) {
+      event.preventDefault();
+    }
+  });
+
+  root.addEventListener('drop', (event) => {
+    const dropzone = event.target.closest('[data-layout-dropzone]');
+    if (!dropzone) return;
+    event.preventDefault();
+    const libraryId = event.dataTransfer?.getData('application/x-machine-library-id') || event.dataTransfer?.getData('text/plain');
+    const svg = dropzone.querySelector('.layout-canvas');
+    const asset = machineLibrary.find((machine) => machine.id === libraryId);
+    if (!svg || !asset) return;
+    const rect = svg.getBoundingClientRect();
+    const floorX = ((event.clientX - rect.left) / rect.width) * factoryDesign.floorSize.width - asset.footprint.w / 2;
+    const floorY = ((event.clientY - rect.top) / rect.height) * factoryDesign.floorSize.height - asset.footprint.h / 2;
+    if (placeLibraryMachine(libraryId, floorX, floorY)) {
+      renderApp(root);
+    }
+  });
+
   root.addEventListener('click', (event) => {
     const copyTarget = event.target.closest('[data-copy-prompt]');
     if (copyTarget) {
@@ -283,6 +387,14 @@ export function bindApp(root = document.querySelector('#root')) {
         navigator.clipboard?.writeText(prompt.value);
         copyTarget.textContent = 'Prompt copied';
       }
+      return;
+    }
+
+    const libraryTarget = event.target.closest('[data-library-machine-id]');
+    if (libraryTarget) {
+      const offset = appState.layoutMachines.length % 5;
+      placeLibraryMachine(libraryTarget.dataset.libraryMachineId, 1.4 + offset * 3.2, 10);
+      renderApp(root);
       return;
     }
 
@@ -312,4 +424,4 @@ export function bindApp(root = document.querySelector('#root')) {
   });
 }
 
-export { appState, tabs, layoutSvg, flowGraph };
+export { appState, tabs, layoutSvg, flowGraph, placeLibraryMachine, resetLayoutMachines };
