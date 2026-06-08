@@ -4,4 +4,5 @@ await rm('dist', { recursive: true, force: true });
 await mkdir('dist/src', { recursive: true });
 await copyFile('index.html', 'dist/index.html');
 await cp('src', 'dist/src', { recursive: true });
+await cp('config', 'dist/config', { recursive: true });
 console.log('Static app built into dist/');

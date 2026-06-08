@@ -1,0 +1,89 @@
+[[machines]]
+id = "prep"
+name = "Feedstock Prep Cell"
+type = "Material Conditioning"
+status = "Nominal"
+operator = "1 shared"
+cycleTime = 42
+uptime = 96
+energy = 4.8
+inputs = ["Polymer pellets", "Copper blanks"]
+outputs = ["Dried resin", "Stamped contacts"]
+parameters = [{ label = "Dryer temp", value = "74 °C" }, { label = "Moisture target", value = "< 0.04%" }, { label = "Blank feed rate", value = "68/min" }]
+[machines.footprint]
+x = 1.2
+y = 2.2
+w = 4.1
+h = 2.4
+
+[[machines]]
+id = "mold"
+name = "Precision Molding Island"
+type = "Forming"
+status = "Optimizing"
+operator = "Lights-out"
+cycleTime = 58
+uptime = 93
+energy = 18.2
+inputs = ["Dried resin", "Stamped contacts"]
+outputs = ["Overmolded shell"]
+parameters = [{ label = "Clamp force", value = "120 ton" }, { label = "Mold temp", value = "62 °C" }, { label = "Cavity count", value = "4-up" }]
+[machines.footprint]
+x = 7.1
+y = 1.4
+w = 4.6
+h = 3.1
+
+[[machines]]
+id = "pcb"
+name = "Electronics Assembly Cell"
+type = "SMT + Micro Assembly"
+status = "Nominal"
+operator = "1 technician"
+cycleTime = 51
+uptime = 97
+energy = 9.6
+inputs = ["Bare PCB", "MEMS sensor", "Battery tab"]
+outputs = ["Testable PCB stack"]
+parameters = [{ label = "Placement accuracy", value = "±18 µm" }, { label = "Reflow profile", value = "Lead-free 5-zone" }, { label = "AOI sampling", value = "100%" }]
+[machines.footprint]
+x = 13.4
+y = 1.8
+w = 4.5
+h = 2.8
+
+[[machines]]
+id = "assembly"
+name = "Robotic Final Assembly"
+type = "Assembly"
+status = "Nominal"
+operator = "1 shared"
+cycleTime = 55
+uptime = 95
+energy = 7.4
+inputs = ["Overmolded shell", "Testable PCB stack", "Gasket"]
+outputs = ["Sealed sensor pod"]
+parameters = [{ label = "Robot reach", value = "900 mm" }, { label = "Adhesive bead", value = "0.42 mm" }, { label = "Torque control", value = "±3%" }]
+[machines.footprint]
+x = 9.2
+y = 7.1
+w = 4.8
+h = 3.2
+
+[[machines]]
+id = "test"
+name = "Validation & Packout"
+type = "Test + Packaging"
+status = "Nominal"
+operator = "1 inspector"
+cycleTime = 47
+uptime = 98
+energy = 3.1
+inputs = ["Sealed sensor pod"]
+outputs = ["Finished and serialized product"]
+parameters = [{ label = "Leak decay", value = "< 0.12 kPa/min" }, { label = "Calibration points", value = "9-axis" }, { label = "Pack format", value = "12 tray carton" }]
+[machines.footprint]
+x = 17.1
+y = 7.3
+w = 4.1
+h = 3.0

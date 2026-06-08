@@ -1,0 +1,10 @@
+[project]
+name = "Aster Microfactory Concept"
+product = "Smart sensor pod"
+throughput = "480 units / shift"
+takt_time = "58 sec"
+
+[floor_size]
+width = 24
+height = 14
+unit = "m"

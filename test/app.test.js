@@ -1,12 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { designYaml, factoryDesign, factoryStep, designMetrics, renderBoardSvg, renderPrompt, reportPdf } from '../src/data.js';
+import { configSourceFiles, designYaml, factoryDesign, factoryStep, designMetrics, renderBoardSvg, renderPrompt, reportPdf } from '../src/data.js';
 import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, tabs } from '../src/app.js';
 
-test('factory design contains required coordinated views', () => {
+test('factory design contains required coordinated views loaded from TOML source files', () => {
   assert.deepEqual(tabs.map((tab) => tab.id), ['summary', 'machines', 'layout', 'envelope', 'flow', 'renders', 'export']);
+  assert.deepEqual(configSourceFiles, [
+    'config/factory.toml',
+    'config/machines.toml',
+    'config/layout.toml',
+    'config/flow.toml',
+    'config/envelopes.toml',
+    'config/renders.toml',
+    'config/export.toml',
+    'config/ui.toml',
+  ]);
+  assert.equal(factoryDesign.name, 'Aster Microfactory Concept');
   assert.equal(factoryDesign.machines.length, 5);
+  assert.equal(factoryDesign.machines[0].footprint.x, 1.2);
+  assert.deepEqual(factoryDesign.machines[0].parameters[0], ['Dryer temp', '74 °C']);
   assert.equal(factoryDesign.flow.length, 5);
   assert.equal(factoryDesign.envelopeOptions.length, 6);
 });

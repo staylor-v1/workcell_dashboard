@@ -8,6 +8,7 @@ const types = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.js', 'text/javascript; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
+  ['.toml', 'text/plain; charset=utf-8'],
 ]);
 
 createServer(async (request, response) => {

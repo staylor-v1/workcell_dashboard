@@ -1,0 +1,31 @@
+[metadata]
+stepTimestamp = "2026-06-08T00:00:00"
+author = "Microfactory Studio"
+organization = "OpenAI"
+preprocessor = "Microfactory Studio exporter"
+originatingSystem = "Microfactory Studio"
+authorization = ""
+
+[[export_packages]]
+id = "step"
+label = "Factory STEP"
+extension = ".step"
+detail = "Whole-factory CAD assembly with envelope, floor, machines, utility keep-outs, and product-flow reference geometry."
+
+[[export_packages]]
+id = "yaml"
+label = "Design YAML"
+extension = ".yaml"
+detail = "Human-readable design source of truth for machines, layout, envelope, flow, renders, and export metadata."
+
+[[export_packages]]
+id = "images"
+label = "Rendered images"
+extension = ".svg"
+detail = "Photorealistic render-board SVG containing the configured render prompts and camera notes."
+
+[[export_packages]]
+id = "pdf"
+label = "PDF report"
+extension = ".pdf"
+detail = "Client-side report package summarizing envelope selection, machine metrics, render prompts, and included export files."
