@@ -140,6 +140,32 @@ export const factoryDesign = {
     ['pcb', 'assembly'],
     ['assembly', 'test'],
   ],
+  renderProfiles: [
+    {
+      id: 'overview',
+      title: 'Factory overview',
+      camera: '24 mm wide angle, 1.6 m operator eye height',
+      lighting: 'soft overhead grid with cyan flow accents',
+      materials: 'brushed aluminum, matte black fixtures, polished concrete',
+      subject: 'all five workcells, aisles, safety envelopes, and animated product-flow traces',
+    },
+    {
+      id: 'assembly-hero',
+      title: 'Assembly hero shot',
+      camera: '70 mm lens, shallow depth of field, three-quarter view',
+      lighting: 'warm key light with cool robotic-cell rim light',
+      materials: 'ceramic grippers, transparent guard panels, satin polymer product shell',
+      subject: 'robot placing the electronics stack and sealing a smart sensor pod',
+    },
+    {
+      id: 'transformation',
+      title: 'Transformation sequence',
+      camera: 'orthographic exploded product-state composition',
+      lighting: 'studio gradient with crisp contact shadows',
+      materials: 'raw resin, stamped copper, populated PCB, gasket adhesive, serialized carton',
+      subject: 'feedstock through validated packaged product in five states',
+    },
+  ],
 };
 
 export function designMetrics(design = factoryDesign) {
@@ -156,4 +182,8 @@ export function designMetrics(design = factoryDesign) {
     totalEnergy: Number(totalEnergy.toFixed(1)),
     bottleneck: bottleneck.name,
   };
+}
+
+export function renderPrompt(profile, design = factoryDesign) {
+  return `Photorealistic industrial microfactory render for ${design.product}: ${profile.subject}. Camera: ${profile.camera}. Lighting: ${profile.lighting}. Materials: ${profile.materials}. Include credible ${design.floorSize.width}m x ${design.floorSize.height}m scale, clean cable routing, safety markings, and premium manufacturing-detail realism.`;
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { factoryDesign, designMetrics } from '../src/data.js';
+import { factoryDesign, designMetrics, renderPrompt } from '../src/data.js';
 import { flowGraph, layoutSvg, tabs } from '../src/app.js';
 
 test('factory design contains required coordinated views', () => {
@@ -22,4 +22,11 @@ test('layout and flow render from the same machine and flow model', () => {
   assert.match(layoutMarkup, /Top down microfactory layout/);
   assert.match(layoutMarkup, /Precision Molding Island|Precision/);
   assert.match(graphMarkup, /Finished tested product/);
+});
+
+test('render profiles produce photorealistic prompts from the shared design', () => {
+  assert.equal(factoryDesign.renderProfiles.length, 3);
+  const prompt = renderPrompt(factoryDesign.renderProfiles[0]);
+  assert.match(prompt, /Photorealistic industrial microfactory render/);
+  assert.match(prompt, /24m x 14m scale/);
 });

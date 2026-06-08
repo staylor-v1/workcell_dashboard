@@ -1,4 +1,4 @@
-import { factoryDesign, designMetrics } from './data.js';
+import { factoryDesign, designMetrics, renderPrompt } from './data.js';
 
 const tabs = [
   { id: 'summary', label: 'Summary' },
@@ -222,20 +222,26 @@ function renderFlow() {
 }
 
 function renderRenders() {
-  const prompts = [
-    'Wide-angle view showing all five cells with warm overhead light, polished concrete, and subtle product-flow glow.',
-    'Hero render of the robotic final assembly station sealing a sensor pod with shallow depth of field.',
-    'Exploded product-state render: feedstock, molded shell, electronics core, sealed pod, tested carton.',
-  ];
   return `
     <section class="workspace renders-view">
       <span class="eyebrow">Photorealistic render planner</span>
-      <h1>Turn the design into credible visual direction</h1>
-      <p>Create render briefs from the same factory design: materials, lighting, camera intent, and process-state storytelling.</p>
+      <h1>Create credible visual direction from the factory model</h1>
+      <p>Each render card is generated from the same machines, floor scale, and process story as the rest of the studio, turning the design into a practical photorealistic render brief.</p>
       <div class="render-grid">
-        ${prompts
+        ${factoryDesign.renderProfiles
           .map(
-            (prompt, index) => `<article class="render-brief"><div class="render-shot shot-${index + 1}"></div><h3>Render ${index + 1}</h3><p>${prompt}</p><button>Use as render brief</button></article>`,
+            (profile, index) => `<article class="render-brief">
+              <div class="render-shot shot-${index + 1}"><span>${profile.title}</span></div>
+              <h3>${profile.title}</h3>
+              <dl class="render-specs">
+                <div><dt>Camera</dt><dd>${profile.camera}</dd></div>
+                <div><dt>Lighting</dt><dd>${profile.lighting}</dd></div>
+                <div><dt>Materials</dt><dd>${profile.materials}</dd></div>
+              </dl>
+              <label class="prompt-label" for="prompt-${profile.id}">Render prompt</label>
+              <textarea id="prompt-${profile.id}" readonly>${renderPrompt(profile)}</textarea>
+              <button data-copy-prompt="prompt-${profile.id}">Copy render prompt</button>
+            </article>`,
           )
           .join('')}
       </div>
@@ -269,6 +275,17 @@ export function renderApp(root = document.querySelector('#root')) {
 export function bindApp(root = document.querySelector('#root')) {
   if (!root) return;
   root.addEventListener('click', (event) => {
+    const copyTarget = event.target.closest('[data-copy-prompt]');
+    if (copyTarget) {
+      const prompt = root.querySelector(`#${copyTarget.dataset.copyPrompt}`);
+      if (prompt) {
+        prompt.select();
+        navigator.clipboard?.writeText(prompt.value);
+        copyTarget.textContent = 'Prompt copied';
+      }
+      return;
+    }
+
     const target = event.target.closest('[data-tab-target], [data-machine-id]');
     if (!target) return;
     if (target.dataset.tabTarget) {

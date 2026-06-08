@@ -21,4 +21,11 @@ Open `http://localhost:4173`.
 ```bash
 npm test
 npm run build
+npm run snapshot
 ```
+
+`npm run snapshot` writes `artifacts/microfactory-studio.html` and `artifacts/microfactory-studio.png`; it requires the `wkhtmltoimage` binary from `wkhtmltopdf`.
+
+## Render prompts
+
+The Renders tab generates copy-ready photorealistic render prompts from the shared factory design, including camera, lighting, material, scale, and process-story details.
