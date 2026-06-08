@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { factoryDesign, machineLibrary, designMetrics, renderPrompt } from '../src/data.js';
 import { appState, flowGraph, layoutSvg, placeLibraryMachine, resetLayoutMachines, tabs } from '../src/app.js';
+import { readFile } from 'node:fs/promises';
+import { flowGraph, layoutSvg, tabs } from '../src/app.js';
 
 test('factory design contains required coordinated views', () => {
   assert.deepEqual(tabs.map((tab) => tab.id), ['summary', 'machines', 'layout', 'flow', 'renders']);
@@ -53,4 +55,13 @@ test('machines from the palette can be placed onto the layout model', () => {
   assert.equal(placed.footprint.x <= factoryDesign.floorSize.width - placed.footprint.w - 0.6, true);
   assert.match(layoutSvg(), /Haas/);
   resetLayoutMachines();
+test('browser entrypoint loads stylesheet from HTML and keeps JavaScript browser-safe', async () => {
+  const [html, main] = await Promise.all([
+    readFile('index.html', 'utf8'),
+    readFile('src/main.js', 'utf8'),
+  ]);
+
+  assert.match(html, /<title>Microfactory Studio<\/title>/);
+  assert.match(html, /<link rel="stylesheet" href="\/src\/styles\.css" \/>/);
+  assert.doesNotMatch(main, /import\s+['"].*\.css['"]/);
 });
