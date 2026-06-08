@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "dev": "node server.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test"
+  },
+  "type": "module"
+}
