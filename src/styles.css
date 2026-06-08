@@ -97,6 +97,7 @@ p { color: var(--muted); line-height: 1.65; }
 .machine-card h3 { margin: .8rem 0; letter-spacing: -.025em; }
 .status { color: #07101d; background: var(--accent); border-radius: 999px; padding: .22rem .55rem; font-weight: 800; }
 .status.optimizing { background: var(--warn); }
+.status.placed, .status.candidate { background: var(--accent-2); }
 .parameter-list { margin: 1rem 0 0; padding: 0; list-style: none; display: grid; gap: .55rem; }
 .parameter-list li { display: flex; justify-content: space-between; gap: 1rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: .55rem; }
 .parameter-list strong { color: var(--text); }
@@ -199,4 +200,30 @@ dd { margin: .2rem 0 0; line-height: 1.5; }
 
 @media (max-width: 920px) {
   .envelope-grid, .export-grid, .envelope-detail, .custom-dimensions { grid-template-columns: 1fr; }
+}
+
+.layout-workbench { display: flex; gap: 1rem; align-items: flex-start; }
+.layout-stage { flex: 1 1 auto; min-width: 0; }
+.machine-palette { flex: 0 0 min(360px, 34%); max-height: min(78vh, 780px); overflow: auto; border: 1px solid var(--line); border-radius: 28px; background: rgba(2, 6, 23, .46); padding: 1rem; }
+.machine-palette__header { position: sticky; top: 0; z-index: 1; margin: -1rem -1rem 1rem; padding: 1rem; background: linear-gradient(180deg, rgba(8, 17, 31, .98), rgba(8, 17, 31, .9)); border-bottom: 1px solid var(--line); backdrop-filter: blur(16px); }
+.machine-palette__header h2 { margin: .45rem 0; }
+.machine-palette__header p { margin-bottom: 0; font-size: .9rem; }
+.machine-palette__group { display: grid; gap: .7rem; margin-bottom: 1rem; }
+.machine-palette__group h3 { margin: .25rem 0 0; color: var(--accent); font-size: .84rem; letter-spacing: .12em; text-transform: uppercase; }
+.palette-machine { display: grid; gap: .55rem; padding: .85rem; border: 1px solid rgba(148, 163, 184, .2); border-radius: 18px; background: linear-gradient(160deg, rgba(15, 23, 42, .82), rgba(2, 6, 23, .52)); cursor: grab; transition: transform .2s ease, border-color .2s ease, background .2s ease; }
+.palette-machine:hover, .palette-machine:focus-visible { transform: translateY(-2px); border-color: rgba(62, 231, 198, .5); background: linear-gradient(160deg, rgba(62, 231, 198, .13), rgba(2, 6, 23, .55)); outline: none; }
+.palette-machine:active { cursor: grabbing; }
+.palette-machine div { display: grid; gap: .15rem; }
+.palette-machine strong { line-height: 1.2; }
+.palette-machine span, .palette-machine p { color: var(--muted); font-size: .82rem; line-height: 1.4; }
+.palette-machine p { margin: 0; }
+.palette-machine small { justify-self: start; color: #06121f; background: var(--accent); border-radius: 999px; padding: .3rem .55rem; font-weight: 900; }
+.palette-machine a { color: var(--accent); font-size: .78rem; font-weight: 800; text-decoration: none; }
+.palette-machine a:hover { text-decoration: underline; }
+.layout-shell:not(.compact) { min-height: 440px; }
+.layout-shell:not(.compact)::after { content: "Drop machines here"; position: absolute; right: 1rem; bottom: 1rem; color: var(--muted); border: 1px dashed rgba(62, 231, 198, .38); border-radius: 999px; padding: .35rem .65rem; background: rgba(2, 6, 23, .65); font-size: .78rem; font-weight: 800; pointer-events: none; }
+
+@media (max-width: 920px) {
+  .layout-workbench { flex-direction: column; }
+  .machine-palette { flex-basis: auto; width: 100%; max-height: none; }
 }

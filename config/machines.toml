@@ -87,3 +87,192 @@ x = 17.1
 y = 7.3
 w = 4.1
 h = 3.0
+
+[[machine_catalog]]
+id = "eos-m290"
+name = "EOS M 290"
+type = "Metal 3D printer · LPBF"
+category = "Metal additive"
+status = "Candidate"
+operator = "Powder-trained technician"
+cycleTime = 14400
+uptime = 92
+energy = 8.5
+inputs = ["Metal powder", "Build plate", "Inert gas"]
+outputs = ["DMLS metal parts"]
+buildVolume = "250 × 250 × 325 mm"
+researchNote = "Industrial mid-size DMLS platform with broad validated material/process ecosystem."
+sourceLabel = "EOS M 290 technical data"
+sourceUrl = "https://www.eos.info/en-us/metal-solutions/metal-printers/eos-m-290"
+parameters = [{ label = "Build volume", value = "250 × 250 × 325 mm" }, { label = "Laser", value = "1 × 400 W Yb fiber" }, { label = "Machine size", value = "2.5 × 1.3 m" }]
+[machine_catalog.footprint]
+w = 2.5
+h = 1.3
+
+[[machine_catalog]]
+id = "trumpf-truprint-3000"
+name = "TRUMPF TruPrint 3000"
+type = "Metal 3D printer · LPBF"
+category = "Metal additive"
+status = "Candidate"
+operator = "Powder-trained technician"
+cycleTime = 14400
+uptime = 92
+energy = 12.8
+inputs = ["Metal powder", "Build cylinder", "Nitrogen/argon"]
+outputs = ["Medium-format metal builds"]
+buildVolume = "Ø300 × 400 mm"
+researchNote = "Universal medium-format metal printer near the 300 mm target with industrial powder handling."
+sourceLabel = "TRUMPF TruPrint 3000 specs"
+sourceUrl = "https://www.trumpf.com/en_US/products/machines-systems/additive-production-systems/truprint-3000/"
+parameters = [{ label = "Build volume", value = "Ø300 × 400 mm" }, { label = "Laser option", value = "2 × 500/700 W" }, { label = "Machine size", value = "3.39 × 2.07 m" }]
+[machine_catalog.footprint]
+w = 3.4
+h = 2.1
+
+[[machine_catalog]]
+id = "renishaw-renam-500q"
+name = "Renishaw RenAM 500Q"
+type = "Metal 3D printer · Quad LPBF"
+category = "Metal additive"
+status = "Candidate"
+operator = "Powder-trained technician"
+cycleTime = 14400
+uptime = 91
+energy = 11.0
+inputs = ["Metal powder", "Build plate", "Argon"]
+outputs = ["High-productivity metal parts"]
+buildVolume = "250 × 250 × 350 mm"
+researchNote = "Quad-laser production LPBF option for small industrial parts and serial additive manufacturing."
+sourceLabel = "Renishaw RenAM 500 series"
+sourceUrl = "https://www.renishaw.com/en/--37011"
+parameters = [{ label = "Build volume", value = "250 × 250 × 350 mm" }, { label = "Lasers", value = "4 × 500 W" }, { label = "Class", value = "Production AM" }]
+[machine_catalog.footprint]
+w = 2.2
+h = 1.6
+
+[[machine_catalog]]
+id = "mitsubishi-mv1200s"
+name = "Mitsubishi MV1200S"
+type = "Wire EDM"
+category = "Wire EDM"
+status = "Candidate"
+operator = "EDM machinist"
+cycleTime = 3600
+uptime = 94
+energy = 13.0
+inputs = ["Hardened conductive stock", "Wire", "Deionized water"]
+outputs = ["Precision cut metal parts"]
+buildVolume = "400 × 300 × 220 mm travel"
+researchNote = "Compact production wire EDM with X/Y travel close to the 300 mm cube target."
+sourceLabel = "Mitsubishi MV-S series specs"
+sourceUrl = "https://www.mitsubishielectric-edm.eu/products-solutions/wire-erosion/mv-s-series/"
+parameters = [{ label = "Travel", value = "400 × 300 × 220 mm" }, { label = "Wire", value = "0.1–0.3 mm" }, { label = "Machine size", value = "2.03 × 2.76 m" }]
+[machine_catalog.footprint]
+w = 2.1
+h = 2.8
+
+[[machine_catalog]]
+id = "sodick-vl400q"
+name = "Sodick VL400Q"
+type = "Wire EDM"
+category = "Wire EDM"
+status = "Candidate"
+operator = "EDM machinist"
+cycleTime = 3600
+uptime = 94
+energy = 11.5
+inputs = ["Conductive stock", "Wire", "Dielectric water"]
+outputs = ["High-accuracy cut parts"]
+buildVolume = "400 × 300 × 220 mm travel"
+researchNote = "Linear-motor wire EDM suited to small and medium precision manufacturing cells."
+sourceLabel = "Sodick VL400Q specs"
+sourceUrl = "https://sales.sodick.com/products/wire-edm/vl400q"
+parameters = [{ label = "Travel", value = "400 × 300 × 220 mm" }, { label = "Drive", value = "Linear motors" }, { label = "Class", value = "Precision EDM" }]
+[machine_catalog.footprint]
+w = 2.2
+h = 2.4
+
+[[machine_catalog]]
+id = "makino-u3-heat"
+name = "Makino U3 H.E.A.T."
+type = "Wire EDM"
+category = "Wire EDM"
+status = "Candidate"
+operator = "EDM machinist"
+cycleTime = 3600
+uptime = 93
+energy = 11.5
+inputs = ["Tool steel", "Wire", "Dielectric water"]
+outputs = ["Tooling inserts and precision profiles"]
+buildVolume = "370 × 270 × 220 mm travel"
+researchNote = "Small-footprint industrial wire EDM for toolroom and production applications."
+sourceLabel = "Makino U3 H.E.A.T. specs"
+sourceUrl = "https://www.makino.eu/es-es/machine-technology/machines/wire-edm/u3-heat"
+parameters = [{ label = "Travel", value = "370 × 270 × 220 mm" }, { label = "Technology", value = "H.E.A.T." }, { label = "Class", value = "Toolroom EDM" }]
+[machine_catalog.footprint]
+w = 2.0
+h = 2.4
+
+[[machine_catalog]]
+id = "brother-s300x2"
+name = "Brother SPEEDIO S300X2"
+type = "CNC mill · VMC"
+category = "CNC milling"
+status = "Candidate"
+operator = "CNC machinist"
+cycleTime = 900
+uptime = 95
+energy = 9.5
+inputs = ["Billet", "Cutting tools", "Coolant"]
+outputs = ["Milled metal components"]
+buildVolume = "300 × 400 × 300 mm travel"
+researchNote = "Compact high-speed machining center closely matching a 300 mm-class work envelope."
+sourceLabel = "Brother S300X2 specs"
+sourceUrl = "https://machinetool.global.brother/en-us/all-products/sx2/s300x2"
+parameters = [{ label = "Travel", value = "300 × 400 × 300 mm" }, { label = "Spindle", value = "10k/16k/27k rpm" }, { label = "Floor space", value = "1.08 × 2.46 m" }]
+[machine_catalog.footprint]
+w = 1.1
+h = 2.5
+
+[[machine_catalog]]
+id = "haas-vf1"
+name = "Haas VF-1"
+type = "CNC mill · VMC"
+category = "CNC milling"
+status = "Candidate"
+operator = "CNC machinist"
+cycleTime = 1200
+uptime = 95
+energy = 22.4
+inputs = ["Billet", "Cutting tools", "Coolant"]
+outputs = ["Milled metal components"]
+buildVolume = "508 × 406 × 508 mm travel"
+researchNote = "Common small-shop industrial VMC; larger than target but useful as a baseline production mill."
+sourceLabel = "Haas VF-1 specs"
+sourceUrl = "https://www.haascnc.com/machines/vertical-mills/vf-series/models/small/vf-1.html"
+parameters = [{ label = "Travel", value = "508 × 406 × 508 mm" }, { label = "Spindle", value = "30 hp / 8,100 rpm" }, { label = "Taper", value = "40 taper" }]
+[machine_catalog.footprint]
+w = 2.6
+h = 2.6
+
+[[machine_catalog]]
+id = "datron-neo"
+name = "DATRON neo"
+type = "CNC mill · High-speed"
+category = "CNC milling"
+status = "Candidate"
+operator = "CNC technician"
+cycleTime = 900
+uptime = 94
+energy = 2.0
+inputs = ["Aluminum plate", "Micro tools", "Mist coolant"]
+outputs = ["High-speed milled small parts"]
+buildVolume = "520 × 420 × 220 mm travel"
+researchNote = "Industrial compact high-speed mill for prototypes, electronics, and medical small-part production."
+sourceLabel = "DATRON neo specs"
+sourceUrl = "https://www.datron.com/cnc-machines/datron-neo/"
+parameters = [{ label = "Travel", value = "520 × 420 × 220 mm" }, { label = "Spindle", value = "Up to 40,000 rpm" }, { label = "Mass", value = "~700 kg" }]
+[machine_catalog.footprint]
+w = 1.7
+h = 1.3

@@ -6,9 +6,13 @@ const appState = {
   ...factoryDesign.ui.defaults,
   selectedMachineId: factoryDesign.machines[0].id,
   customEnvelope: { ...factoryDesign.ui.defaults.customEnvelope },
+  placedMachines: [],
 };
 
-const getMachine = (id) => factoryDesign.machines.find((machine) => machine.id === id) ?? factoryDesign.machines[0];
+const layoutMachines = () => [...factoryDesign.machines, ...appState.placedMachines];
+
+const getMachine = (id) => layoutMachines().find((machine) => machine.id === id) ?? factoryDesign.machines[0];
+const getCatalogMachine = (id) => factoryDesign.machineCatalog.find((machine) => machine.id === id);
 
 const selectedEnvelope = () => {
   const envelope = getEnvelope(appState.selectedEnvelopeId);
@@ -48,7 +52,7 @@ function layoutSvg({ compact = false } = {}) {
   const envelope = selectedEnvelope();
   const scaleX = width / Math.max(factoryDesign.floorSize.width, envelope.dimensions.length);
   const scaleY = height / Math.max(factoryDesign.floorSize.height, envelope.dimensions.width);
-  const machines = factoryDesign.machines
+  const machines = layoutMachines()
     .map((machine) => {
       const { x, y, w, h } = machine.footprint;
       const selected = machine.id === appState.selectedMachineId ? ' selected' : '';
@@ -197,6 +201,77 @@ function renderMachines() {
     </section>`;
 }
 
+function machinePalette() {
+  const categories = [...new Set(factoryDesign.machineCatalog.map((machine) => machine.category))];
+  return `
+    <aside class="machine-palette" aria-label="Machine catalog">
+      <div class="machine-palette__header">
+        <span class="eyebrow">Drag-in machine menu</span>
+        <h2>Industrial machine candidates</h2>
+        <p>Researched small and medium facility equipment, biased toward industrial machines with approximately 300 mm-class useful build or travel envelopes.</p>
+      </div>
+      ${categories.map((category) => `
+        <section class="machine-palette__group">
+          <h3>${category}</h3>
+          ${factoryDesign.machineCatalog
+            .filter((machine) => machine.category === category)
+            .map((machine) => `
+              <article class="palette-machine" draggable="true" data-catalog-machine-id="${machine.id}" tabindex="0">
+                <div>
+                  <strong>${machine.name}</strong>
+                  <span>${machine.type}</span>
+                </div>
+                <small>${machine.buildVolume}</small>
+                <p>${machine.researchNote}</p>
+                <a href="${machine.sourceUrl}" target="_blank" rel="noreferrer">${machine.sourceLabel}</a>
+              </article>`)
+            .join('')}
+        </section>`)
+        .join('')}
+    </aside>`;
+}
+
+function createPlacedMachine(catalogMachine, x, y) {
+  const instanceNumber = appState.placedMachines.filter((machine) => machine.catalogId === catalogMachine.id).length + 1;
+  const id = `${catalogMachine.id}-${Date.now().toString(36)}-${instanceNumber}`;
+  return {
+    ...catalogMachine,
+    id,
+    catalogId: catalogMachine.id,
+    status: 'Placed',
+    name: instanceNumber > 1 ? `${catalogMachine.name} #${instanceNumber}` : catalogMachine.name,
+    footprint: {
+      x,
+      y,
+      w: catalogMachine.footprint.w,
+      h: catalogMachine.footprint.h,
+    },
+  };
+}
+
+function dropMachineOnLayout(root, catalogMachineId, clientX, clientY) {
+  const catalogMachine = getCatalogMachine(catalogMachineId);
+  const svg = root.querySelector('.layout-canvas');
+  if (!catalogMachine || !svg) return;
+
+  const bounds = svg.getBoundingClientRect();
+  const envelope = selectedEnvelope();
+  const viewWidth = 640;
+  const viewHeight = 380;
+  const scaleX = viewWidth / Math.max(factoryDesign.floorSize.width, envelope.dimensions.length);
+  const scaleY = viewHeight / Math.max(factoryDesign.floorSize.height, envelope.dimensions.width);
+  const pointerX = ((clientX - bounds.left) / bounds.width) * viewWidth;
+  const pointerY = ((clientY - bounds.top) / bounds.height) * viewHeight;
+  const footprint = catalogMachine.footprint;
+  const x = Math.min(Math.max(pointerX / scaleX - footprint.w / 2, 0), factoryDesign.floorSize.width - footprint.w);
+  const y = Math.min(Math.max(pointerY / scaleY - footprint.h / 2, 0), factoryDesign.floorSize.height - footprint.h);
+  const placedMachine = createPlacedMachine(catalogMachine, Number(x.toFixed(2)), Number(y.toFixed(2)));
+
+  appState.placedMachines = [...appState.placedMachines, placedMachine];
+  appState.selectedMachineId = placedMachine.id;
+  renderApp(root);
+}
+
 function renderLayout() {
   const selected = getMachine(appState.selectedMachineId);
   return `
@@ -205,12 +280,17 @@ function renderLayout() {
         <div><span class="eyebrow">Top-down layout</span><h1>Machine placement and product movement</h1></div>
         <label class="switch"><input type="checkbox" id="flowToggle" ${appState.showFlow ? 'checked' : ''} /> <span>Show product flow</span></label>
       </div>
-      ${layoutSvg()}
-      <aside class="layout-inspector">
-        <strong>${selected.name}</strong>
-        <span>${selected.type}</span>
-        <p>${selected.inputs.join(' + ')} → ${selected.outputs.join(' + ')}</p>
-      </aside>
+      <div class="layout-workbench">
+        ${machinePalette()}
+        <div class="layout-stage">
+          ${layoutSvg()}
+          <aside class="layout-inspector">
+            <strong>${selected.name}</strong>
+            <span>${selected.type}</span>
+            <p>${selected.inputs.join(' + ')} → ${selected.outputs.join(' + ')}</p>
+          </aside>
+        </div>
+      </div>
     </section>`;
 }
 
@@ -433,6 +513,25 @@ export function bindApp(root = document.querySelector('#root')) {
     renderApp(root);
   });
 
+  root.addEventListener('dragstart', (event) => {
+    const paletteMachine = event.target.closest('[data-catalog-machine-id]');
+    if (!paletteMachine) return;
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('text/plain', paletteMachine.dataset.catalogMachineId);
+  });
+
+  root.addEventListener('dragover', (event) => {
+    if (!event.target.closest('.layout-shell')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  });
+
+  root.addEventListener('drop', (event) => {
+    if (!event.target.closest('.layout-shell')) return;
+    event.preventDefault();
+    dropMachineOnLayout(root, event.dataTransfer.getData('text/plain'), event.clientX, event.clientY);
+  });
+
   root.addEventListener('change', (event) => {
     if (event.target.id === 'flowToggle') {
       appState.showFlow = event.target.checked;
@@ -452,4 +551,4 @@ export function bindApp(root = document.querySelector('#root')) {
   });
 }
 
-export { appState, tabs, layoutSvg, flowGraph, renderEnvelope, renderExport, envelopeCadSvg };
+export { appState, tabs, layoutSvg, flowGraph, renderLayout, renderEnvelope, renderExport, envelopeCadSvg };

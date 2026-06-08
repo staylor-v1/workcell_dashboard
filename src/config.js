@@ -38,6 +38,13 @@ function normalizeMachines(machines = []) {
   }));
 }
 
+function normalizeMachineCatalog(machineCatalog = []) {
+  return machineCatalog.map((machine) => ({
+    ...machine,
+    parameters: normalizeParameters(machine.parameters),
+  }));
+}
+
 function normalizeFlowLinks(links = []) {
   return links.map(({ from, to }) => [from, to]);
 }
@@ -59,6 +66,7 @@ export function buildFactoryDesign(config) {
     taktTime: factory.project.takt_time,
     floorSize: factory.floor_size,
     machines: normalizeMachines(machines.machines),
+    machineCatalog: normalizeMachineCatalog(machines.machine_catalog),
     flow: flow.flow,
     flowLinks: normalizeFlowLinks(layout.flow_links),
     envelopeOptions: envelopes.envelopes,

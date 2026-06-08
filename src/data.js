@@ -71,6 +71,15 @@ export function designYaml({ design = factoryDesign, envelope = getEnvelope('con
       energyKw: energy,
       footprint,
     })),
+    machineCatalog: design.machineCatalog.map(({ id, name, type, category, buildVolume, sourceUrl, footprint }) => ({
+      id,
+      name,
+      type,
+      category,
+      buildVolume,
+      sourceUrl,
+      footprint,
+    })),
     flowLinks: design.flowLinks,
     renderProfiles: design.renderProfiles.map(({ id, title, camera, lighting, materials }) => ({ id, title, camera, lighting, materials })),
   };

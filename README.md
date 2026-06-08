@@ -4,7 +4,7 @@ A zero-dependency web application for designing and reasoning about a compact mi
 
 - **Summary** — dashboard cards with miniature layout, machine, flow, and render-planning previews.
 - **Machines** — machine list with cycle time, uptime, energy draw, operating status, and process parameters.
-- **Layout** — top-down factory placement diagram with selectable machines, selected envelope boundary, and toggleable product-flow visualization.
+- **Layout** — top-down factory placement diagram with selectable machines, a researched drag-and-drop machine candidate palette, selected envelope boundary, and toggleable product-flow visualization.
 - **Envelope** — container and building-envelope selector with Conex defaults, custom dimensions, generated CAD previews, and CAD model metadata.
 - **Flow** — text and visual graph representations of feedstock-to-finished-product transformations with an adjustable split bar.
 - **Renders** — photorealistic render-brief cards for turning the design into visual direction.
@@ -16,7 +16,7 @@ A zero-dependency web application for designing and reasoning about a compact mi
 Project-specific data lives in the `config/` directory so users can customize the studio without editing application code:
 
 - `config/factory.toml` — project identity, product, throughput, takt target, and floor size.
-- `config/machines.toml` — available machines, process parameters, inputs/outputs, performance metrics, and layout footprints.
+- `config/machines.toml` — available machines, researched drag-in machine catalog candidates, process parameters, inputs/outputs, performance metrics, source URLs, and layout footprints.
 - `config/layout.toml` — product-flow links between machine IDs.
 - `config/flow.toml` — feedstock-to-finished transformation steps.
 - `config/envelopes.toml` — selectable factory envelopes, dimensions, clearances, and CAD metadata.

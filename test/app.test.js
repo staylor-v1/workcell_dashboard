@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { configSourceFiles, designYaml, factoryDesign, factoryStep, designMetrics, renderBoardSvg, renderPrompt, reportPdf } from '../src/data.js';
-import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, tabs } from '../src/app.js';
+import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderLayout, tabs } from '../src/app.js';
 
 test('factory design contains required coordinated views loaded from TOML source files', () => {
   assert.deepEqual(tabs.map((tab) => tab.id), ['summary', 'machines', 'layout', 'envelope', 'flow', 'renders', 'export']);
@@ -21,6 +21,7 @@ test('factory design contains required coordinated views loaded from TOML source
   assert.equal(factoryDesign.machines[0].footprint.x, 1.2);
   assert.deepEqual(factoryDesign.machines[0].parameters[0], ['Dryer temp', '74 °C']);
   assert.equal(factoryDesign.flow.length, 5);
+  assert.equal(factoryDesign.machineCatalog.length, 9);
   assert.equal(factoryDesign.envelopeOptions.length, 6);
 });
 
@@ -37,6 +38,17 @@ test('layout and flow render from the same machine and flow model', () => {
   assert.match(layoutMarkup, /Top down microfactory layout/);
   assert.match(layoutMarkup, /Precision Molding Island|Precision/);
   assert.match(graphMarkup, /Finished tested product/);
+});
+
+test('layout view exposes researched drag-and-drop industrial machine candidates', () => {
+  const layoutMarkup = renderLayout();
+
+  assert.match(layoutMarkup, /Drag-in machine menu/);
+  assert.match(layoutMarkup, /data-catalog-machine-id="eos-m290"/);
+  assert.match(layoutMarkup, /TRUMPF TruPrint 3000/);
+  assert.match(layoutMarkup, /Mitsubishi MV1200S/);
+  assert.match(layoutMarkup, /Brother SPEEDIO S300X2/);
+  assert.match(layoutMarkup, /draggable="true"/);
 });
 
 test('render profiles produce photorealistic prompts from the shared design', () => {
