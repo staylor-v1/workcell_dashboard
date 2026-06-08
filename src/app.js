@@ -8,22 +8,27 @@ const tabs = [
   { id: 'renders', label: 'Renders' },
 ];
 
+const baselineLayoutMachines = () => factoryDesign.machines.map((machine) => ({ ...machine, source: 'Baseline factory model' }));
+
 const appState = {
   activeTab: 'summary',
   showFlow: true,
   selectedMachineId: factoryDesign.machines[0].id,
-  layoutMachines: factoryDesign.machines.map((machine) => ({ ...machine, source: 'Baseline factory model' })),
+  layoutMachines: baselineLayoutMachines(),
+  placedMachineSequence: 0,
   split: 50,
 };
 
-const getMachine = (id) => appState.layoutMachines.find((machine) => machine.id === id) ?? factoryDesign.machines.find((machine) => machine.id === id) ?? appState.layoutMachines[0];
+const getMachine = (id) =>
+  appState.layoutMachines.find((machine) => machine.id === id) ??
+  factoryDesign.machines.find((machine) => machine.id === id) ??
+  appState.layoutMachines[0];
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
-function machineFromLibrary(libraryId, x = 1.2, y = 1.2) {
+function machineFromLibrary(libraryId, instanceNumber, x = 1.2, y = 1.2) {
   const asset = machineLibrary.find((machine) => machine.id === libraryId);
   if (!asset) return null;
-  const instanceNumber = appState.layoutMachines.filter((machine) => machine.libraryId === asset.id).length + 1;
   const footprint = {
     x: clamp(x, 0.6, factoryDesign.floorSize.width - asset.footprint.w - 0.6),
     y: clamp(y, 0.6, factoryDesign.floorSize.height - asset.footprint.h - 0.6),
@@ -32,7 +37,7 @@ function machineFromLibrary(libraryId, x = 1.2, y = 1.2) {
   };
 
   return {
-    id: `${asset.id}-${Date.now()}-${instanceNumber}`,
+    id: `${asset.id}-${instanceNumber}`,
     libraryId: asset.id,
     name: asset.name,
     type: asset.category,
@@ -52,11 +57,19 @@ function machineFromLibrary(libraryId, x = 1.2, y = 1.2) {
 }
 
 function placeLibraryMachine(libraryId, x, y) {
-  const machine = machineFromLibrary(libraryId, x, y);
+  const instanceNumber = appState.placedMachineSequence + 1;
+  const machine = machineFromLibrary(libraryId, instanceNumber, x, y);
   if (!machine) return false;
+  appState.placedMachineSequence = instanceNumber;
   appState.layoutMachines = [...appState.layoutMachines, machine];
   appState.selectedMachineId = machine.id;
   return true;
+}
+
+function resetLayoutMachines() {
+  appState.layoutMachines = baselineLayoutMachines();
+  appState.placedMachineSequence = 0;
+  appState.selectedMachineId = factoryDesign.machines[0].id;
 }
 
 function machineCard(machine, compact = false) {
@@ -411,4 +424,4 @@ export function bindApp(root = document.querySelector('#root')) {
   });
 }
 
-export { appState, tabs, layoutSvg, flowGraph, placeLibraryMachine };
+export { appState, tabs, layoutSvg, flowGraph, placeLibraryMachine, resetLayoutMachines };

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { factoryDesign, machineLibrary, designMetrics, renderPrompt } from '../src/data.js';
-import { appState, flowGraph, layoutSvg, placeLibraryMachine, tabs } from '../src/app.js';
+import { appState, flowGraph, layoutSvg, placeLibraryMachine, resetLayoutMachines, tabs } from '../src/app.js';
 
 test('factory design contains required coordinated views', () => {
   assert.deepEqual(tabs.map((tab) => tab.id), ['summary', 'machines', 'layout', 'flow', 'renders']);
@@ -43,11 +43,14 @@ test('layout view offers a researched drag-and-drop machine palette', () => {
 });
 
 test('machines from the palette can be placed onto the layout model', () => {
+  resetLayoutMachines();
   const initialCount = appState.layoutMachines.length;
   assert.equal(placeLibraryMachine('haas-mini-mill', 30, 30), true);
   assert.equal(appState.layoutMachines.length, initialCount + 1);
   const placed = appState.layoutMachines.at(-1);
+  assert.equal(placed.id, 'haas-mini-mill-1');
   assert.equal(placed.name, 'Haas Mini Mill');
   assert.equal(placed.footprint.x <= factoryDesign.floorSize.width - placed.footprint.w - 0.6, true);
   assert.match(layoutSvg(), /Haas/);
+  resetLayoutMachines();
 });
