@@ -84,6 +84,49 @@ test('project dashboard lists TOML-backed projects and serializes autosave state
 });
 
 
+
+test('new projects start with no machines and the default workflow is available as the last example project', () => {
+  const previousState = { ...appState, removedMachineIds: [...appState.removedMachineIds], projects: [...appState.projects] };
+  Object.assign(appState, {
+    activeTab: 'projects',
+    currentProjectId: '',
+    currentProjectName: '',
+    projects: [{ id: 'alpha-workcell', name: 'Alpha Workcell', filename: 'alpha-workcell.toml', updatedAt: '2026-06-09T00:00:00.000Z' }],
+    removedMachineIds: factoryDesign.machines.map((machine) => machine.id),
+    selectedMachineId: '',
+  });
+
+  const emptyProject = projectStateFromToml('[project]\nversion = 1\nid = \"empty\"\nname = \"Empty\"\n', {});
+  const layoutMarkup = layoutSvg();
+  const dashboardMarkup = view();
+  const exampleIndex = dashboardMarkup.indexOf('data-load-project-id="example-default-workflow"');
+  const savedProjectIndex = dashboardMarkup.indexOf('data-load-project-id="alpha-workcell"');
+
+  assert.deepEqual(emptyProject.removedMachineIds, factoryDesign.machines.map((machine) => machine.id));
+  assert.doesNotMatch(layoutMarkup, /data-layout-draggable="true"/);
+  assert.match(layoutMarkup, /40ft Conex \/ ISO dry container/);
+  assert.match(dashboardMarkup, /Example: default machine workflow/);
+  assert.ok(exampleIndex > savedProjectIndex);
+
+  Object.assign(appState, previousState);
+});
+
+test('layout view recovers when zoom or pan leaves an invalid viewBox after clicking the container', () => {
+  const previousState = { ...appState, layoutViewBox: appState.layoutViewBox ? { ...appState.layoutViewBox } : null, layoutViewBoxEnvelopeKey: appState.layoutViewBoxEnvelopeKey };
+  Object.assign(appState, {
+    layoutViewBox: { x: Number.NaN, y: Number.POSITIVE_INFINITY, width: 0, height: Number.NaN },
+    layoutViewBoxEnvelopeKey: 'conex-40:12.192:2.438',
+  });
+
+  const layoutMarkup = layoutSvg();
+
+  assert.match(layoutMarkup, /viewBox="-0\.12 -0\.12 12\.432 2\.678/);
+  assert.doesNotMatch(layoutMarkup, /NaN|Infinity/);
+  assert.match(layoutMarkup, /40ft Conex \/ ISO dry container/);
+
+  Object.assign(appState, previousState);
+});
+
 test('project API creates TOML projects with JSON responses', async () => {
   const projectDir = await mkdtemp(join(tmpdir(), 'workcell-projects-'));
   const handleProjectsRequest = createProjectApi({ root: process.cwd(), projectDir });
@@ -133,6 +176,8 @@ test('design metrics identify the bottleneck from shared machine data', () => {
 });
 
 test('layout and flow render from the same machine and flow model', () => {
+  const previousState = { ...appState, removedMachineIds: [...appState.removedMachineIds], layoutViewBox: appState.layoutViewBox ? { ...appState.layoutViewBox } : null };
+  Object.assign(appState, { removedMachineIds: [], selectedMachineId: 'prep', layoutViewBox: null, layoutViewBoxEnvelopeKey: '' });
   const layoutMarkup = layoutSvg();
   const graphMarkup = flowGraph();
   assert.match(layoutMarkup, /Top down microfactory layout/);
@@ -146,6 +191,8 @@ test('layout and flow render from the same machine and flow model', () => {
   assert.match(layoutMarkup, /PMI-58/);
   assert.doesNotMatch(layoutMarkup, /58s takt/);
   assert.match(graphMarkup, /Finished tested product/);
+
+  Object.assign(appState, previousState);
 });
 
 test('flow view uses draggable divider instead of range slider control', () => {
@@ -184,6 +231,8 @@ test('layout view exposes researched drag-and-drop industrial machine candidates
 });
 
 test('selected layout machines expose footprint delete and reposition controls', () => {
+  const previousState = { ...appState, removedMachineIds: [...appState.removedMachineIds], layoutViewBox: appState.layoutViewBox ? { ...appState.layoutViewBox } : null };
+  Object.assign(appState, { removedMachineIds: [], selectedMachineId: 'prep', layoutViewBox: null, layoutViewBoxEnvelopeKey: '' });
   const layoutMarkup = layoutSvg();
 
   assert.match(layoutMarkup, /data-layout-draggable="true"/);
@@ -196,6 +245,8 @@ test('selected layout machines expose footprint delete and reposition controls',
   assert.match(layoutMarkup, /class="layout-machine__rotate-hitbox"/);
   assert.match(layoutMarkup, /data-rotate-machine-id="prep"/);
   assert.match(layoutMarkup, /aria-label="Rotate Feedstock Prep Cell footprint 90 degrees"/);
+
+  Object.assign(appState, previousState);
 });
 
 test('render profiles and engines produce photorealistic prompts and one-click view plans', () => {
