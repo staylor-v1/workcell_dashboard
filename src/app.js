@@ -14,6 +14,8 @@ const appState = {
   placedMachines: [],
   removedMachineIds: [],
   footprintOverrides: {},
+  layoutViewBox: null,
+  layoutViewBoxEnvelopeKey: '',
 };
 
 const withCurrentFootprint = (machine) => ({
@@ -61,34 +63,59 @@ function machineCard(machine, compact = false) {
     </article>`;
 }
 
-function layoutSvg({ compact = false } = {}) {
-  const width = 640;
-  const height = 380;
+function layoutEnvelopeKey() {
   const envelope = selectedEnvelope();
-  const scaleX = width / Math.max(factoryDesign.floorSize.width, envelope.dimensions.length);
-  const scaleY = height / Math.max(factoryDesign.floorSize.height, envelope.dimensions.width);
+  const { length, width } = envelope.dimensions;
+  return `${envelope.id}:${length}:${width}`;
+}
+
+function defaultLayoutViewBox() {
+  const envelope = selectedEnvelope();
+  const padding = Math.max(Math.min(envelope.dimensions.length, envelope.dimensions.width) * 0.035, 0.12);
+  return {
+    x: -padding,
+    y: -padding,
+    width: envelope.dimensions.length + padding * 2,
+    height: envelope.dimensions.width + padding * 2,
+  };
+}
+
+function currentLayoutViewBox() {
+  const key = layoutEnvelopeKey();
+  if (!appState.layoutViewBox || appState.layoutViewBoxEnvelopeKey !== key) {
+    appState.layoutViewBox = defaultLayoutViewBox();
+    appState.layoutViewBoxEnvelopeKey = key;
+  }
+  return appState.layoutViewBox;
+}
+
+function viewBoxAttribute(viewBox) {
+  return `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`;
+}
+
+function layoutSvg({ compact = false } = {}) {
+  const envelope = selectedEnvelope();
+  const viewBox = compact
+    ? { x: -0.5, y: -0.5, width: Math.max(factoryDesign.floorSize.width, envelope.dimensions.length) + 1, height: Math.max(factoryDesign.floorSize.height, envelope.dimensions.width) + 1 }
+    : currentLayoutViewBox();
   const machines = layoutMachines()
     .map((machine) => {
       const { x, y, w, h } = machine.footprint;
       const selected = machine.id === appState.selectedMachineId;
       const selectedClass = selected ? ' selected' : '';
-      const rectX = x * scaleX;
-      const rectY = y * scaleY;
-      const rectWidth = w * scaleX;
-      const rectHeight = h * scaleY;
-      const deleteX = rectX + rectWidth - 12;
-      const deleteY = rectY + 12;
+      const deleteX = x + w - 0.18;
+      const deleteY = y + 0.18;
       const deleteControl = selected && !compact
         ? `<g class="layout-machine__delete" data-delete-machine-id="${machine.id}" tabindex="0" role="button" aria-label="Delete ${machine.name} from layout">
-            <circle cx="${deleteX}" cy="${deleteY}" r="12" />
-            <path d="M ${deleteX - 4} ${deleteY - 4} L ${deleteX + 4} ${deleteY + 4} M ${deleteX + 4} ${deleteY - 4} L ${deleteX - 4} ${deleteY + 4}" />
+            <circle cx="${deleteX}" cy="${deleteY}" r="0.18" />
+            <path d="M ${deleteX - 0.06} ${deleteY - 0.06} L ${deleteX + 0.06} ${deleteY + 0.06} M ${deleteX + 0.06} ${deleteY - 0.06} L ${deleteX - 0.06} ${deleteY + 0.06}" />
           </g>`
         : '';
       return `
         <g class="layout-machine${selectedClass}" data-machine-id="${machine.id}" data-layout-draggable="true" tabindex="0" role="button" aria-label="Select and drag ${machine.name}">
-          <rect x="${rectX}" y="${rectY}" width="${rectWidth}" height="${rectHeight}" rx="14" />
-          <text x="${(x + w / 2) * scaleX}" y="${(y + h / 2) * scaleY - 5}" text-anchor="middle">${machine.name.split(' ')[0]}</text>
-          <text class="layout-machine__sub" x="${(x + w / 2) * scaleX}" y="${(y + h / 2) * scaleY + 17}" text-anchor="middle">${machine.cycleTime}s takt</text>
+          <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="0.18" />
+          <text x="${x + w / 2}" y="${y + h / 2 - 0.12}" text-anchor="middle">${machine.name.split(' ')[0]}</text>
+          <text class="layout-machine__sub" x="${x + w / 2}" y="${y + h / 2 + 0.22}" text-anchor="middle">${machine.cycleTime}s takt</text>
         </g>
         ${deleteControl}`;
     })
@@ -102,26 +129,26 @@ function layoutSvg({ compact = false } = {}) {
           if (!fromMachine || !toMachine) return '';
           const from = fromMachine.footprint;
           const to = toMachine.footprint;
-          return `<path class="flow-line" d="M ${(from.x + from.w) * scaleX} ${(from.y + from.h / 2) * scaleY} C ${(from.x + from.w + 1.5) * scaleX} ${(from.y + from.h / 2) * scaleY}, ${(to.x - 1.5) * scaleX} ${(to.y + to.h / 2) * scaleY}, ${to.x * scaleX} ${(to.y + to.h / 2) * scaleY}" />`;
+          return `<path class="flow-line" d="M ${from.x + from.w} ${from.y + from.h / 2} C ${from.x + from.w + 1.5} ${from.y + from.h / 2}, ${to.x - 1.5} ${to.y + to.h / 2}, ${to.x} ${to.y + to.h / 2}" />`;
         })
         .join('')
     : '';
 
   return `
-    <div class="layout-shell ${compact ? 'compact' : ''}">
-      <svg class="layout-canvas" viewBox="0 0 ${width} ${height}" role="img" aria-label="Top down microfactory layout">
+    <div class="layout-shell ${compact ? 'compact' : ''}" data-layout-pan-zoom="${compact ? 'false' : 'true'}">
+      <svg class="layout-canvas" viewBox="${viewBoxAttribute(viewBox)}" data-layout-viewbox="${viewBoxAttribute(viewBox)}" role="img" aria-label="Top down microfactory layout">
         <defs>
-          <pattern id="floor-grid" width="32" height="32" patternUnits="userSpaceOnUse">
-            <path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(148, 163, 184, .18)" stroke-width="1" />
+          <pattern id="floor-grid" width="1" height="1" patternUnits="userSpaceOnUse">
+            <path d="M 1 0 L 0 0 0 1" fill="none" stroke="rgba(148, 163, 184, .18)" stroke-width="0.025" />
           </pattern>
           <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
             <path d="M0,0 L0,6 L8,3 z" fill="#3ee7c6" />
           </marker>
         </defs>
-        <rect width="${width}" height="${height}" rx="24" fill="url(#floor-grid)" />
-        <rect x="18" y="18" width="${width - 36}" height="${height - 36}" rx="20" class="floor-boundary" />
-        <rect x="0" y="0" width="${envelope.dimensions.length * scaleX}" height="${envelope.dimensions.width * scaleY}" rx="18" class="envelope-boundary" />
-        <text x="24" y="34" class="envelope-label">${envelope.name}</text>
+        <rect x="${viewBox.x}" y="${viewBox.y}" width="${viewBox.width}" height="${viewBox.height}" rx="0.24" fill="url(#floor-grid)" />
+        <rect x="0" y="0" width="${factoryDesign.floorSize.width}" height="${factoryDesign.floorSize.height}" rx="0.2" class="floor-boundary" />
+        <rect x="0" y="0" width="${envelope.dimensions.length}" height="${envelope.dimensions.width}" rx="0.16" class="envelope-boundary" />
+        <text x="0.24" y="0.38" class="envelope-label">${envelope.name}</text>
         ${flows}
         ${machines}
       </svg>
@@ -286,17 +313,11 @@ function dropMachineOnLayout(root, catalogMachineId, clientX, clientY) {
   const svg = root.querySelector('.layout-canvas');
   if (!catalogMachine || !svg) return;
 
-  const bounds = svg.getBoundingClientRect();
-  const envelope = selectedEnvelope();
-  const viewWidth = 640;
-  const viewHeight = 380;
-  const scaleX = viewWidth / Math.max(factoryDesign.floorSize.width, envelope.dimensions.length);
-  const scaleY = viewHeight / Math.max(factoryDesign.floorSize.height, envelope.dimensions.width);
-  const pointerX = ((clientX - bounds.left) / bounds.width) * viewWidth;
-  const pointerY = ((clientY - bounds.top) / bounds.height) * viewHeight;
+  const pointer = pointerToLayout(svg, clientX, clientY);
   const footprint = catalogMachine.footprint;
-  const x = Math.min(Math.max(pointerX / scaleX - footprint.w / 2, 0), factoryDesign.floorSize.width - footprint.w);
-  const y = Math.min(Math.max(pointerY / scaleY - footprint.h / 2, 0), factoryDesign.floorSize.height - footprint.h);
+  const bounds = layoutPlacementBounds(footprint);
+  const x = Math.min(Math.max(pointer.x - footprint.w / 2, 0), bounds.width - footprint.w);
+  const y = Math.min(Math.max(pointer.y - footprint.h / 2, 0), bounds.height - footprint.h);
   const placedMachine = createPlacedMachine(catalogMachine, Number(x.toFixed(2)), Number(y.toFixed(2)));
 
   appState.placedMachines = [...appState.placedMachines, placedMachine];
@@ -305,30 +326,34 @@ function dropMachineOnLayout(root, catalogMachineId, clientX, clientY) {
 }
 
 
-function layoutScales() {
-  const envelope = selectedEnvelope();
-  const viewWidth = 640;
-  const viewHeight = 380;
-  return {
-    viewWidth,
-    viewHeight,
-    scaleX: viewWidth / Math.max(factoryDesign.floorSize.width, envelope.dimensions.length),
-    scaleY: viewHeight / Math.max(factoryDesign.floorSize.height, envelope.dimensions.width),
-  };
+function svgViewBox(svg) {
+  const [x, y, width, height] = (svg.getAttribute('viewBox') ?? viewBoxAttribute(currentLayoutViewBox()))
+    .split(/\s+/)
+    .map(Number);
+  return { x, y, width, height };
 }
 
 function pointerToLayout(svg, clientX, clientY) {
   const bounds = svg.getBoundingClientRect();
-  const { viewWidth, viewHeight, scaleX, scaleY } = layoutScales();
-  const pointerX = ((clientX - bounds.left) / bounds.width) * viewWidth;
-  const pointerY = ((clientY - bounds.top) / bounds.height) * viewHeight;
-  return { x: pointerX / scaleX, y: pointerY / scaleY };
+  const viewBox = svgViewBox(svg);
+  const pointerX = viewBox.x + ((clientX - bounds.left) / bounds.width) * viewBox.width;
+  const pointerY = viewBox.y + ((clientY - bounds.top) / bounds.height) * viewBox.height;
+  return { x: pointerX, y: pointerY };
+}
+
+function layoutPlacementBounds(footprint = { w: 0, h: 0 }) {
+  const envelope = selectedEnvelope();
+  return {
+    width: Math.max(envelope.dimensions.length, footprint.w, 0.1),
+    height: Math.max(envelope.dimensions.width, footprint.h, 0.1),
+  };
 }
 
 function clampedFootprintPosition(machine, x, y) {
+  const bounds = layoutPlacementBounds(machine.footprint);
   return {
-    x: Number(Math.min(Math.max(x, 0), factoryDesign.floorSize.width - machine.footprint.w).toFixed(2)),
-    y: Number(Math.min(Math.max(y, 0), factoryDesign.floorSize.height - machine.footprint.h).toFixed(2)),
+    x: Number(Math.min(Math.max(x, 0), bounds.width - machine.footprint.w).toFixed(2)),
+    y: Number(Math.min(Math.max(y, 0), bounds.height - machine.footprint.h).toFixed(2)),
   };
 }
 
@@ -388,6 +413,61 @@ function startMachineDrag(root, machineElement, event) {
   window.addEventListener('pointermove', handlePointerMove);
   window.addEventListener('pointerup', handlePointerUp, { once: true });
 }
+function setLayoutViewBox(svg, viewBox) {
+  appState.layoutViewBox = viewBox;
+  svg.setAttribute('viewBox', viewBoxAttribute(viewBox));
+  svg.dataset.layoutViewbox = viewBoxAttribute(viewBox);
+}
+
+function zoomLayoutAtPointer(svg, event) {
+  event.preventDefault();
+  const current = svgViewBox(svg);
+  const pointer = pointerToLayout(svg, event.clientX, event.clientY);
+  const zoomFactor = event.deltaY < 0 ? 0.88 : 1.14;
+  const envelope = selectedEnvelope();
+  const minWidth = Math.max(envelope.dimensions.length * 0.16, 1.2);
+  const maxWidth = Math.max(factoryDesign.floorSize.width, envelope.dimensions.length) * 1.8;
+  const nextWidth = Math.min(Math.max(current.width * zoomFactor, minWidth), maxWidth);
+  const nextHeight = nextWidth * (current.height / current.width);
+  const ratioX = (pointer.x - current.x) / current.width;
+  const ratioY = (pointer.y - current.y) / current.height;
+  setLayoutViewBox(svg, {
+    x: pointer.x - ratioX * nextWidth,
+    y: pointer.y - ratioY * nextHeight,
+    width: nextWidth,
+    height: nextHeight,
+  });
+}
+
+function startLayoutPan(root, svg, event) {
+  if (event.target.closest('[data-layout-draggable], [data-delete-machine-id]')) return;
+  event.preventDefault();
+  svg.setPointerCapture?.(event.pointerId);
+  const start = { x: event.clientX, y: event.clientY, viewBox: svgViewBox(svg) };
+  document.body.classList.add('is-panning-layout');
+
+  const handlePointerMove = (moveEvent) => {
+    const bounds = svg.getBoundingClientRect();
+    const dx = ((moveEvent.clientX - start.x) / bounds.width) * start.viewBox.width;
+    const dy = ((moveEvent.clientY - start.y) / bounds.height) * start.viewBox.height;
+    setLayoutViewBox(svg, {
+      ...start.viewBox,
+      x: start.viewBox.x - dx,
+      y: start.viewBox.y - dy,
+    });
+  };
+
+  const handlePointerUp = () => {
+    document.body.classList.remove('is-panning-layout');
+    svg.releasePointerCapture?.(event.pointerId);
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+  };
+
+  window.addEventListener('pointermove', handlePointerMove);
+  window.addEventListener('pointerup', handlePointerUp, { once: true });
+}
+
 
 function renderLayout() {
   const selected = getMachine(appState.selectedMachineId);
@@ -911,6 +991,12 @@ export function bindApp(root = document.querySelector('#root')) {
     dropMachineOnLayout(root, event.dataTransfer.getData('text/plain'), event.clientX, event.clientY);
   });
 
+  root.addEventListener('wheel', (event) => {
+    const svg = event.target.closest('.layout-shell[data-layout-pan-zoom="true"] .layout-canvas');
+    if (!svg) return;
+    zoomLayoutAtPointer(svg, event);
+  }, { passive: false });
+
   root.addEventListener('pointerdown', (event) => {
     const divider = event.target.closest('[data-split-divider]');
     if (divider) {
@@ -919,7 +1005,13 @@ export function bindApp(root = document.querySelector('#root')) {
     }
 
     const machine = event.target.closest('[data-layout-draggable]');
-    if (machine) startMachineDrag(root, machine, event);
+    if (machine) {
+      startMachineDrag(root, machine, event);
+      return;
+    }
+
+    const layoutCanvas = event.target.closest('.layout-shell[data-layout-pan-zoom="true"] .layout-canvas');
+    if (layoutCanvas) startLayoutPan(root, layoutCanvas, event);
   });
 
   root.addEventListener('keydown', (event) => {

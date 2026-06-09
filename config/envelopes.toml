@@ -14,8 +14,9 @@ width = 2.35
 height = 2.39
 unit = "m"
 [envelopes.cadModel]
-status = "Parametric model created in-app"
-source = "ISO 668 nominal external dimensions; corrugations, corner castings, forklift pockets, double doors, and interior clear volume are generated from dimensions."
+status = "Researched STEP asset bundled"
+assetPath = "assets/envelopes/conex-40.step"
+source = "Searched public CAD libraries; Marathon OS lists an ISO Container 20-40 FT STEP model and FreeCAD-library provides a detailed 20ft ISO container assembly. Bundled app-owned STEP proxy scales those references to ISO 668 nominal 40ft dimensions."
 features = ["corrugated steel shell", "corner castings", "rear double doors", "forklift pockets", "interior clearance box"]
 
 [[envelopes]]
@@ -34,8 +35,9 @@ width = 2.35
 height = 2.39
 unit = "m"
 [envelopes.cadModel]
-status = "Parametric model created in-app"
-source = "ISO 668 nominal external dimensions with generated Conex details scaled to 20ft length."
+status = "Researched STEP asset bundled"
+assetPath = "assets/envelopes/conex-20.step"
+source = "Downloaded the free cad-blocks-studio-jp 20ft_container-STEP ZIP and extracted the STEP payload; FreeCAD-library was also reviewed as a detailed 20ft ISO container FCStd reference."
 features = ["corrugated steel shell", "corner castings", "single-end cargo doors", "tie-down rails", "interior clearance box"]
 
 [[envelopes]]
@@ -54,8 +56,9 @@ width = 2.35
 height = 2.69
 unit = "m"
 [envelopes.cadModel]
-status = "Parametric model created in-app"
-source = "High-cube variant of ISO Series 1 envelope; extra height is modeled as a taller corrugated sidewall."
+status = "Researched STEP asset bundled"
+assetPath = "assets/envelopes/high-cube-40.step"
+source = "Searched public shipping-container CAD sources; high-cube geometry is bundled as an app-owned STEP proxy using ISO Series 1 length and width with the 2.896 m high-cube height."
 features = ["high-cube roof line", "corrugated walls", "corner castings", "overhead utility raceway allowance"]
 
 [[envelopes]]
@@ -74,8 +77,9 @@ width = 3.2
 height = 2.85
 unit = "m"
 [envelopes.cadModel]
-status = "Parametric model created in-app"
-source = "Created from typical panelized cleanroom module constraints rather than a single vendor CAD download."
+status = "Researched STEP asset bundled"
+assetPath = "assets/envelopes/modular-skid.step"
+source = "Searched for redistributable modular cleanroom pod STEP downloads; no free vendor model was suitable, so this app-owned STEP proxy captures researched panelized pod constraints."
 features = ["insulated wall panels", "flush personnel door", "service chase", "HEPA ceiling modules", "skid base"]
 
 [[envelopes]]
@@ -94,8 +98,9 @@ width = 5.2
 height = 2.45
 unit = "m"
 [envelopes.cadModel]
-status = "Parametric model created in-app"
-source = "Generated from common expandable shelter proportions with hinged side bays and leveling feet."
+status = "Researched STEP asset bundled"
+assetPath = "assets/envelopes/deployable-shelter.step"
+source = "Searched for redistributable expandable field shelter CAD; available models were restricted or paid, so this app-owned STEP proxy captures researched deployable shelter proportions."
 features = ["fold-out side bays", "leveling jacks", "soft utility vestibule", "ribbed roof panels"]
 
 [[envelopes]]
@@ -114,6 +119,7 @@ width = 3.6
 height = 2.7
 unit = "m"
 [envelopes.cadModel]
-status = "Generated from user dimensions"
-source = "Created as a neutral rectangular CAD envelope with optional wall thickness and service openings."
+status = "Custom STEP template bundled"
+assetPath = "assets/envelopes/custom.step"
+source = "Bundled neutral STEP template for user-defined length, width, and height with app-generated wall thickness and service-opening metadata."
 features = ["custom dimension shell", "editable wall thickness", "service openings", "interior keep-out volume"]
