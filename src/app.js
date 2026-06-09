@@ -299,13 +299,49 @@ function renderFlow() {
     <section class="workspace">
       <div class="panel-heading large">
         <div><span class="eyebrow">Process flow</span><h1>Feedstock-to-finished transformation model</h1></div>
-        <label class="range-label">Visual focus <input id="splitRange" type="range" min="25" max="75" value="${appState.split}" /></label>
+        <span class="split-hint">Drag the divider to balance text and graphics</span>
       </div>
-      <div class="flow-split" style="grid-template-columns: ${appState.split}% 1fr">
-        <section class="flow-text-panel"><h2>Text representation</h2>${flowText()}</section>
-        <section class="flow-visual-panel"><h2>Visual graph</h2>${flowGraph()}</section>
+      <div class="flow-split" data-resizable-split style="grid-template-columns: minmax(280px, ${appState.split}%) 14px minmax(320px, 1fr)">
+        <section class="flow-text-panel" id="flow-text-panel"><h2>Text representation</h2>${flowText()}</section>
+        <button class="split-divider" type="button" data-split-divider aria-label="Drag to resize text and visual flow panels" aria-controls="flow-text-panel flow-visual-panel" aria-valuemin="25" aria-valuemax="75" aria-valuenow="${appState.split}" role="separator"></button>
+        <section class="flow-visual-panel" id="flow-visual-panel"><h2>Visual graph</h2>${flowGraph()}</section>
       </div>
     </section>`;
+}
+
+function setSplitFromPointer(root, splitContainer, clientX) {
+  const bounds = splitContainer.getBoundingClientRect();
+  if (!bounds.width) return;
+  const rawSplit = ((clientX - bounds.left) / bounds.width) * 100;
+  appState.split = Math.min(75, Math.max(25, Math.round(rawSplit)));
+  splitContainer.style.gridTemplateColumns = `minmax(280px, ${appState.split}%) 14px minmax(320px, 1fr)`;
+  const divider = splitContainer.querySelector('[data-split-divider]');
+  divider?.setAttribute('aria-valuenow', String(appState.split));
+}
+
+function startSplitDrag(root, divider, event) {
+  const splitContainer = divider.closest('[data-resizable-split]');
+  if (!splitContainer) return;
+
+  event.preventDefault();
+  divider.setPointerCapture?.(event.pointerId);
+  document.body.classList.add('is-resizing-split');
+  setSplitFromPointer(root, splitContainer, event.clientX);
+
+  const handlePointerMove = (moveEvent) => {
+    setSplitFromPointer(root, splitContainer, moveEvent.clientX);
+  };
+
+  const handlePointerUp = () => {
+    document.body.classList.remove('is-resizing-split');
+    divider.releasePointerCapture?.(event.pointerId);
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+    renderApp(root);
+  };
+
+  window.addEventListener('pointermove', handlePointerMove);
+  window.addEventListener('pointerup', handlePointerUp, { once: true });
 }
 
 function renderRenders() {
@@ -453,7 +489,7 @@ function handleExport(kind) {
   if (file) downloadText(...file);
 }
 
-function view() {
+export function view() {
   const content = {
     summary: renderSummary,
     machines: renderMachines,
@@ -476,6 +512,10 @@ function view() {
 
 export function renderApp(root = document.querySelector('#root')) {
   if (!root) return;
+  if (globalThis.__microfactoryRenderApp) {
+    globalThis.__microfactoryRenderApp();
+    return;
+  }
   root.innerHTML = view();
 }
 
@@ -532,6 +572,23 @@ export function bindApp(root = document.querySelector('#root')) {
     dropMachineOnLayout(root, event.dataTransfer.getData('text/plain'), event.clientX, event.clientY);
   });
 
+  root.addEventListener('pointerdown', (event) => {
+    const divider = event.target.closest('[data-split-divider]');
+    if (divider) startSplitDrag(root, divider, event);
+  });
+
+  root.addEventListener('keydown', (event) => {
+    const divider = event.target.closest('[data-split-divider]');
+    if (!divider || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+
+    event.preventDefault();
+    if (event.key === 'Home') appState.split = 25;
+    if (event.key === 'End') appState.split = 75;
+    if (event.key === 'ArrowLeft') appState.split = Math.max(25, appState.split - 2);
+    if (event.key === 'ArrowRight') appState.split = Math.min(75, appState.split + 2);
+    renderApp(root);
+  });
+
   root.addEventListener('change', (event) => {
     if (event.target.id === 'flowToggle') {
       appState.showFlow = event.target.checked;
@@ -540,10 +597,6 @@ export function bindApp(root = document.querySelector('#root')) {
   });
 
   root.addEventListener('input', (event) => {
-    if (event.target.id === 'splitRange') {
-      appState.split = Number(event.target.value);
-      renderApp(root);
-    }
     if (event.target.dataset.customDimension) {
       appState.customEnvelope[event.target.dataset.customDimension] = Number(event.target.value);
       renderApp(root);
@@ -551,4 +604,4 @@ export function bindApp(root = document.querySelector('#root')) {
   });
 }
 
-export { appState, tabs, layoutSvg, flowGraph, renderLayout, renderEnvelope, renderExport, envelopeCadSvg };
+export { appState, tabs, layoutSvg, flowGraph, renderFlow, renderLayout, renderEnvelope, renderExport, envelopeCadSvg };

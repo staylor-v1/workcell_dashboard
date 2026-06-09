@@ -1,9 +1,15 @@
 {
   "scripts": {
-    "dev": "node server.mjs",
-    "build": "node scripts/build.mjs",
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
     "test": "node --test",
     "snapshot": "node scripts/snapshot.mjs"
   },
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "vite": "^8.0.16"
+  }
 }

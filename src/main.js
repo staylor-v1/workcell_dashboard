@@ -1,3 +1,1 @@
-import { bindApp, renderApp } from './app.js';
-renderApp();
-bindApp();
+import './main.jsx';

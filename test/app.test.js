@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, renderBoardSvg, renderPrompt, reportPdf } from '../src/data.js';
-import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderLayout, tabs } from '../src/app.js';
+import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderFlow, renderLayout, tabs } from '../src/app.js';
 import { parseToml } from '../src/toml.js';
 
 test('factory design contains required coordinated views loaded from TOML source files', () => {
@@ -39,6 +39,16 @@ test('layout and flow render from the same machine and flow model', () => {
   assert.match(layoutMarkup, /Top down microfactory layout/);
   assert.match(layoutMarkup, /Precision Molding Island|Precision/);
   assert.match(graphMarkup, /Finished tested product/);
+});
+
+test('flow view uses draggable divider instead of range slider control', () => {
+  const flowMarkup = renderFlow();
+
+  assert.match(flowMarkup, /data-resizable-split/);
+  assert.match(flowMarkup, /data-split-divider/);
+  assert.match(flowMarkup, /role="separator"/);
+  assert.doesNotMatch(flowMarkup, /type="range"/);
+  assert.doesNotMatch(flowMarkup, /splitRange/);
 });
 
 test('layout view exposes researched drag-and-drop industrial machine candidates', () => {
