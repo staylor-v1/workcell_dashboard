@@ -1,4 +1,4 @@
-import { designMetrics, designToml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, renderBoardSvg, renderPrompt, reportPdf } from './data.js';
+import { designMetrics, designToml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, getRenderEngine, getRenderResolution, normalizedRenderResolution, renderBoardSvg, renderJobManifest, renderPrompt, renderViewPlan, reportPdf } from './data.js';
 
 const tabs = factoryDesign.ui.tabs;
 
@@ -6,6 +6,11 @@ const appState = {
   ...factoryDesign.ui.defaults,
   selectedMachineId: factoryDesign.machines[0].id,
   customEnvelope: { ...factoryDesign.ui.defaults.customEnvelope },
+  selectedRenderEngineId: factoryDesign.renderEngines[0].id,
+  selectedResolutionId: '2k',
+  customResolution: { ...factoryDesign.renderResolutions.find((resolution) => resolution.id === 'custom') },
+  showCustomResolutionModal: false,
+  renderStatus: '',
   placedMachines: [],
   removedMachineIds: [],
   footprintOverrides: {},
@@ -456,12 +461,88 @@ function startSplitDrag(root, divider, event) {
   window.addEventListener('pointerup', handlePointerUp, { once: true });
 }
 
+function renderEngineCard(engine) {
+  const selected = engine.id === appState.selectedRenderEngineId;
+  return `
+    <article class="render-engine-card ${selected ? 'selected' : ''}" data-render-engine-id="${engine.id}">
+      <div class="render-engine-card__top"><span>${engine.quality}</span><strong>${engine.samples} spp</strong></div>
+      <h3>${engine.name}</h3>
+      <p>${engine.integrator}</p>
+      <dl class="render-specs compact">
+        <div><dt>Engine</dt><dd>${engine.engine}</dd></div>
+        <div><dt>Resolution</dt><dd>${engine.resolution}</dd></div>
+        <div><dt>Color/output</dt><dd>${engine.color}</dd></div>
+      </dl>
+      <ul class="render-settings-list">${engine.settings.map((setting) => `<li>${setting}</li>`).join('')}</ul>
+      <a href="${engine.source_url}" target="_blank" rel="noreferrer">${engine.source_label}</a>
+    </article>`;
+}
+
+function selectedRenderResolution() {
+  return normalizedRenderResolution(appState.selectedResolutionId === 'custom' ? appState.customResolution : getRenderResolution(appState.selectedResolutionId));
+}
+
+function renderResolutionButton(resolution) {
+  const selected = resolution.id === appState.selectedResolutionId;
+  const size = normalizedRenderResolution(resolution.id === 'custom' ? appState.customResolution : resolution);
+  return `<button class="resolution-option ${selected ? 'selected' : ''}" data-render-resolution-id="${resolution.id}" type="button"><strong>${resolution.label}</strong><span>${size.width} × ${size.height}</span></button>`;
+}
+
+function renderResolutionModal() {
+  if (!appState.showCustomResolutionModal) return '';
+  return `
+    <div class="modal-backdrop" role="presentation" data-close-resolution-modal="true">
+      <section class="resolution-modal" role="dialog" aria-modal="true" aria-labelledby="custom-resolution-title">
+        <h2 id="custom-resolution-title">Custom render resolution</h2>
+        <p>Set exact output pixels for all three deterministic render views.</p>
+        <div class="custom-resolution-fields">
+          <label>Width (px)<input type="number" min="64" max="16384" step="1" data-custom-render-resolution="width" value="${appState.customResolution.width}" /></label>
+          <label>Height (px)<input type="number" min="64" max="16384" step="1" data-custom-render-resolution="height" value="${appState.customResolution.height}" /></label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" data-close-resolution-modal="true">Cancel</button>
+          <button type="button" data-save-custom-resolution="true">Use custom resolution</button>
+        </div>
+      </section>
+    </div>`;
+}
+
 function renderRenders() {
+  const engine = getRenderEngine(appState.selectedRenderEngineId);
+  const resolution = selectedRenderResolution();
   return `
     <section class="workspace renders-view">
       <span class="eyebrow">Photorealistic render planner</span>
       <h1>Create credible visual direction from the factory model</h1>
-      <p>Each render card is generated from the same machines, floor scale, and process story as the rest of the studio, turning the design into a practical photorealistic render brief.</p>
+      <p>Choose Blender Cycles, LuxCoreRender, or Mitsuba 3, then click Render to produce the required top-down, container-door, and orthographic factory views with researched high-quality defaults already applied.</p>
+      <section class="render-engine-picker" aria-label="Photorealistic render engine options">
+        ${factoryDesign.renderEngines.map(renderEngineCard).join('')}
+      </section>
+      <section class="resolution-picker" aria-label="Render resolution options">
+        <div><span class="eyebrow">Resolution</span><h2>Image output size</h2></div>
+        <div class="resolution-options">${factoryDesign.renderResolutions.map(renderResolutionButton).join('')}</div>
+      </section>
+      <section class="render-action-panel">
+        <div>
+          <span class="eyebrow">Selected engine</span>
+          <h2>${engine.name}</h2>
+          <p>${engine.command}</p>
+          <small>${resolution.label}: ${resolution.width} × ${resolution.height}px for each view</small>
+        </div>
+        <button data-render-selected-engine="${engine.id}">${engine.render_button}</button>
+        ${appState.renderStatus ? `<strong class="render-status">${appState.renderStatus}</strong>` : ''}
+      </section>
+      <div class="render-view-grid">
+        ${factoryDesign.renderViews.map((view) => `
+          <article class="render-view-card">
+            <span>${view.title}</span>
+            <h3>${view.output}</h3>
+            <p>${renderViewPlan(engine, view, factoryDesign, resolution)}</p>
+          </article>`).join('')}
+      </div>
+      <label class="prompt-label" for="render-job-manifest">One-click render job manifest</label>
+      <textarea id="render-job-manifest" class="render-manifest" readonly>${renderJobManifest(engine, factoryDesign, resolution)}</textarea>
+      ${renderResolutionModal()}
       <div class="render-grid">
         ${factoryDesign.renderProfiles
           .map(
@@ -631,6 +712,17 @@ export function renderApp(root = document.querySelector('#root')) {
   root.innerHTML = view();
 }
 
+async function startRenderJob(engine, resolution) {
+  const response = await fetch('/api/render', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ engineId: engine.id, resolution, execute: true }),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? 'Render job failed');
+  return result;
+}
+
 export function bindApp(root = document.querySelector('#root')) {
   if (!root) return;
   root.addEventListener('click', (event) => {
@@ -642,6 +734,42 @@ export function bindApp(root = document.querySelector('#root')) {
         navigator.clipboard?.writeText(prompt.value);
         copyTarget.textContent = 'Prompt copied';
       }
+      return;
+    }
+
+    const saveResolution = event.target.closest('[data-save-custom-resolution]');
+    if (saveResolution) {
+      appState.selectedResolutionId = 'custom';
+      appState.showCustomResolutionModal = false;
+      renderApp(root);
+      return;
+    }
+
+    const closeResolutionModal = event.target.closest('[data-close-resolution-modal]');
+    if (closeResolutionModal && event.target === closeResolutionModal) {
+      appState.showCustomResolutionModal = false;
+      renderApp(root);
+      return;
+    }
+
+    const renderButton = event.target.closest('[data-render-selected-engine]');
+    if (renderButton) {
+      const engine = getRenderEngine(renderButton.dataset.renderSelectedEngine);
+      const resolution = selectedRenderResolution();
+      appState.selectedRenderEngineId = engine.id;
+      appState.renderStatus = `${engine.name} render job starting at ${resolution.width} × ${resolution.height}.`;
+      renderApp(root);
+      startRenderJob(engine, resolution)
+        .then((job) => {
+          appState.renderStatus = job.rendererAvailable
+            ? `${engine.name} render complete: ${job.outputs.join(', ')}`
+            : `${engine.name} scene generated at ${job.jobDir}; install ${job.executable} to execute renders.`;
+          renderApp(root);
+        })
+        .catch((error) => {
+          appState.renderStatus = `${engine.name} render setup failed: ${error.message}`;
+          renderApp(root);
+        });
       return;
     }
 
@@ -658,7 +786,8 @@ export function bindApp(root = document.querySelector('#root')) {
       return;
     }
 
-    const target = event.target.closest('[data-tab-target], [data-machine-id], [data-envelope-id]');
+    const target = event.target.closest('[data-tab-target], [data-machine-id], [data-envelope-id], [data-render-engine-id], [data-render-resolution-id]');
+
     if (!target) return;
     if (target.dataset.tabTarget) {
       appState.activeTab = target.dataset.tabTarget;
@@ -668,6 +797,15 @@ export function bindApp(root = document.querySelector('#root')) {
     }
     if (target.dataset.envelopeId) {
       appState.selectedEnvelopeId = target.dataset.envelopeId;
+    }
+    if (target.dataset.renderEngineId) {
+      appState.selectedRenderEngineId = target.dataset.renderEngineId;
+      appState.renderStatus = '';
+    }
+    if (target.dataset.renderResolutionId) {
+      appState.selectedResolutionId = target.dataset.renderResolutionId;
+      appState.showCustomResolutionModal = target.dataset.renderResolutionId === 'custom';
+      appState.renderStatus = '';
     }
     renderApp(root);
   });
@@ -734,7 +872,10 @@ export function bindApp(root = document.querySelector('#root')) {
       appState.customEnvelope[event.target.dataset.customDimension] = Number(event.target.value);
       renderApp(root);
     }
+    if (event.target.dataset.customRenderResolution) {
+      appState.customResolution[event.target.dataset.customRenderResolution] = Number(event.target.value);
+    }
   });
 }
 
-export { appState, tabs, layoutSvg, flowGraph, renderFlow, renderLayout, renderEnvelope, renderExport, envelopeCadSvg };
+export { appState, tabs, layoutSvg, flowGraph, renderFlow, renderLayout, renderRenders, renderEnvelope, renderExport, envelopeCadSvg };
