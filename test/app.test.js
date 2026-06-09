@@ -25,7 +25,7 @@ test('factory design contains required coordinated views loaded from TOML source
   assert.equal(factoryDesign.machines[0].footprint.x, 1.2);
   assert.deepEqual(factoryDesign.machines[0].parameters[0], ['Dryer temp', '74 °C']);
   assert.equal(factoryDesign.flow.length, 5);
-  assert.equal(factoryDesign.machineCatalog.length, 9);
+  assert.equal(factoryDesign.machineCatalog.length, 10);
   assert.equal(factoryDesign.envelopeOptions.length, 6);
   assert.deepEqual(factoryDesign.renderEngines.map((engine) => engine.name), ['Blender Cycles', 'LuxCoreRender', 'Mitsuba 3']);
   assert.deepEqual(factoryDesign.renderViews.map((view) => view.id), ['top-down', 'container-door', 'orthographic']);
@@ -64,9 +64,15 @@ test('layout view exposes researched drag-and-drop industrial machine candidates
   assert.match(layoutMarkup, /Drag-in machine menu/);
   assert.match(layoutMarkup, /data-catalog-machine-id="eos-m290"/);
   assert.match(layoutMarkup, /TRUMPF TruPrint 3000/);
+  assert.match(layoutMarkup, /Nikon SLM Solutions SLM 280 2.0/);
   assert.match(layoutMarkup, /Mitsubishi MV1200S/);
   assert.match(layoutMarkup, /Brother SPEEDIO S300X2/);
   assert.match(layoutMarkup, /draggable="true"/);
+
+  const nikon = factoryDesign.machineCatalog.find((machine) => machine.id === 'nikon-slm280-2');
+  assert.equal(nikon.footprint.w, 3.15);
+  assert.equal(nikon.footprint.h, 1.28);
+  assert.match(nikon.sourceUrl, /System-Nikon-SLM280-2-02024\.pdf/);
 });
 
 test('selected layout machines expose footprint delete and reposition controls', () => {
@@ -166,12 +172,13 @@ test('export tab generates Omniverse USD, STEP, TOML, render-board SVG, and PDF 
 
 test('machine STEP assets exist for every layout-available machine and render script writes deterministic scenes', async () => {
   const machines = [...factoryDesign.machines, ...factoryDesign.machineCatalog];
-  assert.equal(machines.length, 14);
+  assert.equal(machines.length, 15);
 
   for (const machine of machines) {
     const step = await readFile(machine.assetPath, 'utf8');
     assert.match(step, /ISO-10303-21/);
     assert.ok(step.includes(machine.id));
+    assert.match(step, /dimension_source/);
   }
 
   const out = await mkdtemp(join(tmpdir(), 'microfactory-render-'));
@@ -186,7 +193,7 @@ test('machine STEP assets exist for every layout-available machine and render sc
   assert.equal(scene.resolution.width, 1234);
   assert.equal(scene.resolution.height, 777);
   assert.equal(scene.assets.length, machines.length);
-  assert.match(manifest, /Assets: 14 STEP files/);
+  assert.match(manifest, /Assets: 15 STEP files/);
   assert.match(mitsubaScene, /<scene version="3.0.0">/);
   assert.match(mitsubaScene, /sample_count" value="1024"/);
   assert.match(luxMesh, /element vertex 8/);

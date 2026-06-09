@@ -104,7 +104,10 @@ buildVolume = "250 × 250 × 325 mm"
 researchNote = "Industrial mid-size DMLS platform with broad validated material/process ecosystem."
 sourceLabel = "EOS M 290 technical data"
 sourceUrl = "https://www.eos.info/en-us/metal-solutions/metal-printers/eos-m-290"
-parameters = [{ label = "Build volume", value = "250 × 250 × 325 mm" }, { label = "Laser", value = "1 × 400 W Yb fiber" }, { label = "Machine size", value = "2.5 × 1.3 m" }]
+parameters = [{ label = "Build volume", value = "250 × 250 × 325 mm" }, { label = "Laser", value = "1 × 400 W Yb fiber" }, { label = "Machine dimensions", value = "2.500 × 1.300 × 2.190 m" }]
+cadSourceLabel = "No public OEM CAD found; app proxy uses EOS envelope dimensions"
+cadSourceUrl = "https://www.eos.info/en-us/metal-solutions/metal-printers/eos-m-290"
+assetNote = "Deterministic STEP proxy scaled to documented machine dimensions because no redistributable OEM CAD model was found."
 [machine_catalog.footprint]
 w = 2.5
 h = 1.3
@@ -125,10 +128,38 @@ buildVolume = "Ø300 × 400 mm"
 researchNote = "Universal medium-format metal printer near the 300 mm target with industrial powder handling."
 sourceLabel = "TRUMPF TruPrint 3000 specs"
 sourceUrl = "https://www.trumpf.com/en_US/products/machines-systems/additive-production-systems/truprint-3000/"
-parameters = [{ label = "Build volume", value = "Ø300 × 400 mm" }, { label = "Laser option", value = "2 × 500/700 W" }, { label = "Machine size", value = "3.39 × 2.07 m" }]
+parameters = [{ label = "Build volume", value = "Ø300 × 400 mm" }, { label = "Laser option", value = "2 × 500/700 W" }, { label = "Machine dimensions", value = "3.385 × 2.070 × 1.750 m incl. filter" }]
+cadSourceLabel = "No public OEM CAD found; app proxy uses TRUMPF documented dimensions"
+cadSourceUrl = "https://www.trumpf.com/en_US/products/machines-systems/additive-production-systems/truprint-3000/"
+assetNote = "Deterministic STEP proxy scaled to documented dimensions including filter because no redistributable OEM CAD model was found."
 [machine_catalog.footprint]
-w = 3.4
-h = 2.1
+w = 3.385
+h = 2.070
+
+
+[[machine_catalog]]
+id = "nikon-slm280-2"
+name = "Nikon SLM Solutions SLM 280 2.0"
+type = "Metal 3D printer · LPBF"
+category = "Metal additive"
+status = "Candidate"
+operator = "Powder-trained technician"
+cycleTime = 14400
+uptime = 92
+energy = 5.5
+inputs = ["Metal powder", "Build plate", "Argon"]
+outputs = ["Mid-size metal AM builds"]
+buildVolume = "280 × 280 × 365 mm"
+researchNote = "Mid-size Nikon SLM platform with a larger 280 mm square build plate and rapid powder-change workflow."
+sourceLabel = "Nikon SLM 280 2.0 system brochure"
+sourceUrl = "https://nikon-slm-solutions.com/wp-content/uploads/2024/04/System-Nikon-SLM280-2-02024.pdf"
+parameters = [{ label = "Build envelope", value = "280 × 280 × 365 mm" }, { label = "Laser options", value = "1 × 700 W or 2 × 700 W" }, { label = "Machine dimensions", value = "3.150 × 1.280 × 2.470 m" }]
+cadSourceLabel = "No public OEM CAD found; app proxy uses Nikon SLM documented dimensions"
+cadSourceUrl = "https://nikon-slm-solutions.com/wp-content/uploads/2024/04/System-Nikon-SLM280-2-02024.pdf"
+assetNote = "Deterministic STEP proxy scaled to Nikon SLM brochure dimensions because no redistributable OEM CAD model was found."
+[machine_catalog.footprint]
+w = 3.150
+h = 1.280
 
 [[machine_catalog]]
 id = "renishaw-renam-500q"
@@ -144,12 +175,15 @@ inputs = ["Metal powder", "Build plate", "Argon"]
 outputs = ["High-productivity metal parts"]
 buildVolume = "250 × 250 × 350 mm"
 researchNote = "Quad-laser production LPBF option for small industrial parts and serial additive manufacturing."
-sourceLabel = "Renishaw RenAM 500 series"
-sourceUrl = "https://www.renishaw.com/en/--37011"
-parameters = [{ label = "Build volume", value = "250 × 250 × 350 mm" }, { label = "Lasers", value = "4 × 500 W" }, { label = "Class", value = "Production AM" }]
+sourceLabel = "Renishaw RenAM 500 series data sheet"
+sourceUrl = "https://www.renishaw.com/resourcecentre/en/download/data-sheet-renam-500-series-additive-manufacturing-systems--140423"
+parameters = [{ label = "Build volume", value = "250 × 250 × 350 mm" }, { label = "Lasers", value = "4 × 500 W" }, { label = "Machine dimensions", value = "1.236 × 2.165 × 2.130 m without accessories" }]
+cadSourceLabel = "Dassault DELMIA fabrication RenAM 500Q model listing"
+cadSourceUrl = "https://3dswym.3dexperience.3ds.com/wiki/delmia-fabrication/renam-500q_6KxBnIK9TCCP2FjRyflNRQ"
+assetNote = "Deterministic STEP proxy scaled to Renishaw data-sheet dimensions; public CAD listing requires 3DEXPERIENCE access and is not bundled."
 [machine_catalog.footprint]
-w = 2.2
-h = 1.6
+w = 1.236
+h = 2.165
 
 [[machine_catalog]]
 id = "mitsubishi-mv1200s"
@@ -167,10 +201,13 @@ buildVolume = "400 × 300 × 220 mm travel"
 researchNote = "Compact production wire EDM with X/Y travel close to the 300 mm cube target."
 sourceLabel = "Mitsubishi MV-S series specs"
 sourceUrl = "https://www.mitsubishielectric-edm.eu/products-solutions/wire-erosion/mv-s-series/"
-parameters = [{ label = "Travel", value = "400 × 300 × 220 mm" }, { label = "Wire", value = "0.1–0.3 mm" }, { label = "Machine size", value = "2.03 × 2.76 m" }]
+parameters = [{ label = "Travel", value = "400 × 300 × 220 mm" }, { label = "Wire", value = "0.1–0.3 mm" }, { label = "Machine dimensions", value = "2.025 × 2.760 × 2.015 m" }]
+cadSourceLabel = "Mitsubishi EDM downloads include layout drawing, not redistributable 3D CAD"
+cadSourceUrl = "https://www.mitsubishielectric-edm.eu/service/downloads/"
+assetNote = "Deterministic STEP proxy scaled to Mitsubishi documented installation footprint; public download search found layout drawings but no redistributable 3D CAD."
 [machine_catalog.footprint]
-w = 2.1
-h = 2.8
+w = 2.025
+h = 2.760
 
 [[machine_catalog]]
 id = "sodick-vl400q"
@@ -188,10 +225,13 @@ buildVolume = "400 × 300 × 220 mm travel"
 researchNote = "Linear-motor wire EDM suited to small and medium precision manufacturing cells."
 sourceLabel = "Sodick VL400Q specs"
 sourceUrl = "https://sales.sodick.com/products/wire-edm/vl400q"
-parameters = [{ label = "Travel", value = "400 × 300 × 220 mm" }, { label = "Drive", value = "Linear motors" }, { label = "Class", value = "Precision EDM" }]
+parameters = [{ label = "Travel", value = "400 × 300 × 220 mm" }, { label = "Drive", value = "Linear motors" }, { label = "Machine dimensions", value = "2.020 × 2.310 × 1.990 m" }]
+cadSourceLabel = "No public OEM CAD found; app proxy uses Sodick documented machine-tool dimensions"
+cadSourceUrl = "https://sales.sodick.com/products/wire-edm/vl400q"
+assetNote = "Deterministic STEP proxy scaled to documented Sodick machine-tool dimensions because no redistributable OEM CAD model was found."
 [machine_catalog.footprint]
-w = 2.2
-h = 2.4
+w = 2.020
+h = 2.310
 
 [[machine_catalog]]
 id = "makino-u3-heat"
@@ -207,12 +247,15 @@ inputs = ["Tool steel", "Wire", "Dielectric water"]
 outputs = ["Tooling inserts and precision profiles"]
 buildVolume = "370 × 270 × 220 mm travel"
 researchNote = "Small-footprint industrial wire EDM for toolroom and production applications."
-sourceLabel = "Makino U3 H.E.A.T. specs"
-sourceUrl = "https://www.makino.eu/es-es/machine-technology/machines/wire-edm/u3-heat"
-parameters = [{ label = "Travel", value = "370 × 270 × 220 mm" }, { label = "Technology", value = "H.E.A.T." }, { label = "Class", value = "Toolroom EDM" }]
+sourceLabel = "Makino U3 H.E.A.T. specification sheet"
+sourceUrl = "https://static.machinetools.com/uploads/8129344/Makino-U3-Spec-Sheet.pdf"
+parameters = [{ label = "Travel", value = "370 × 270 × 220 mm" }, { label = "Technology", value = "H.E.A.T." }, { label = "Machine tool dimensions", value = "1.950 × 2.300 × 2.116 m" }]
+cadSourceLabel = "No public OEM CAD found; app proxy uses Makino machine-tool dimensions"
+cadSourceUrl = "https://static.machinetools.com/uploads/8129344/Makino-U3-Spec-Sheet.pdf"
+assetNote = "Deterministic STEP proxy scaled to documented Makino machine-tool dimensions because no redistributable OEM CAD model was found."
 [machine_catalog.footprint]
-w = 2.0
-h = 2.4
+w = 1.950
+h = 2.300
 
 [[machine_catalog]]
 id = "brother-s300x2"
@@ -230,10 +273,13 @@ buildVolume = "300 × 400 × 300 mm travel"
 researchNote = "Compact high-speed machining center closely matching a 300 mm-class work envelope."
 sourceLabel = "Brother S300X2 specs"
 sourceUrl = "https://machinetool.global.brother/en-us/all-products/sx2/s300x2"
-parameters = [{ label = "Travel", value = "300 × 400 × 300 mm" }, { label = "Spindle", value = "10k/16k/27k rpm" }, { label = "Floor space", value = "1.08 × 2.46 m" }]
+parameters = [{ label = "Travel", value = "300 × 400 × 300 mm" }, { label = "Spindle", value = "10k/16k/27k rpm" }, { label = "Required floor space", value = "1.080 × 2.463 m" }]
+cadSourceLabel = "No public OEM CAD found; app proxy uses Brother required floor space"
+cadSourceUrl = "https://machinetool.global.brother/en-us/all-products/sx2/s300x2"
+assetNote = "Deterministic STEP proxy scaled to documented required floor space because no redistributable OEM CAD model was found."
 [machine_catalog.footprint]
-w = 1.1
-h = 2.5
+w = 1.080
+h = 2.463
 
 [[machine_catalog]]
 id = "haas-vf1"
@@ -251,10 +297,13 @@ buildVolume = "508 × 406 × 508 mm travel"
 researchNote = "Common small-shop industrial VMC; larger than target but useful as a baseline production mill."
 sourceLabel = "Haas VF-1 specs"
 sourceUrl = "https://www.haascnc.com/machines/vertical-mills/vf-series/models/small/vf-1.html"
-parameters = [{ label = "Travel", value = "508 × 406 × 508 mm" }, { label = "Spindle", value = "30 hp / 8,100 rpm" }, { label = "Taper", value = "40 taper" }]
+parameters = [{ label = "Travel", value = "508 × 406 × 508 mm" }, { label = "Spindle", value = "30 hp / 8,100 rpm" }, { label = "Layout envelope", value = "2.184 × 3.505 m from Haas layout drawing" }]
+cadSourceLabel = "Haas VF-1 3D Model ZIP"
+cadSourceUrl = "https://www.haascnc.com/machines/vertical-mills/vf-series/models/small/vf-1.html"
+assetNote = "Deterministic STEP proxy scaled to Haas layout drawing envelope; Haas publishes a 3D Model ZIP but notes it may not match the latest production model, so it is not bundled."
 [machine_catalog.footprint]
-w = 2.6
-h = 2.6
+w = 2.184
+h = 3.505
 
 [[machine_catalog]]
 id = "datron-neo"
@@ -272,7 +321,10 @@ buildVolume = "520 × 420 × 220 mm travel"
 researchNote = "Industrial compact high-speed mill for prototypes, electronics, and medical small-part production."
 sourceLabel = "DATRON neo specs"
 sourceUrl = "https://www.datron.com/cnc-machines/datron-neo/"
-parameters = [{ label = "Travel", value = "520 × 420 × 220 mm" }, { label = "Spindle", value = "Up to 40,000 rpm" }, { label = "Mass", value = "~700 kg" }]
+parameters = [{ label = "Travel", value = "520 × 420 × 220 mm" }, { label = "Spindle", value = "Up to 40,000 rpm" }, { label = "Installation dimensions", value = "1.320 × 1.450 × 1.900 m with terminal" }]
+cadSourceLabel = "No public OEM CAD found; app proxy uses DATRON installation dimensions"
+cadSourceUrl = "https://www.datron.de/products/cnc-milling-machines/datron-neo"
+assetNote = "Deterministic STEP proxy scaled to DATRON neo installation dimensions with operator terminal because no redistributable OEM CAD model was found."
 [machine_catalog.footprint]
-w = 1.7
-h = 1.3
+w = 1.320
+h = 1.450
