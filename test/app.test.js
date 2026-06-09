@@ -47,6 +47,8 @@ test('layout and flow render from the same machine and flow model', () => {
   assert.match(layoutMarkup, /data-layout-pan-zoom="true"/);
   assert.match(layoutMarkup, /viewBox="-0\.12 -0\.12 12\.432 2\.678/);
   assert.match(layoutMarkup, /Precision Molding Island|Precision/);
+  assert.match(layoutMarkup, /PMI-58/);
+  assert.doesNotMatch(layoutMarkup, /58s takt/);
   assert.match(graphMarkup, /Finished tested product/);
 });
 
