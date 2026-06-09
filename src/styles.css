@@ -113,10 +113,17 @@ dd { margin: .2rem 0 0; line-height: 1.5; }
 .layout-canvas { display: block; width: 100%; height: min(62vh, 640px); min-height: 360px; }
 .layout-shell.compact .layout-canvas { height: 285px; min-height: 220px; }
 .floor-boundary { fill: rgba(15, 23, 42, .45); stroke: rgba(148, 163, 184, .26); stroke-width: 2; }
+.layout-machine { cursor: grab; touch-action: none; }
+.layout-machine:active { cursor: grabbing; }
 .layout-machine rect { fill: rgba(134, 168, 255, .18); stroke: rgba(134, 168, 255, .7); stroke-width: 2; filter: drop-shadow(0 12px 18px rgba(0,0,0,.25)); }
 .layout-machine.selected rect { fill: rgba(62, 231, 198, .24); stroke: var(--accent); }
-.layout-machine text { fill: var(--text); font-weight: 800; font-size: 15px; pointer-events: none; }
+.layout-machine text { fill: var(--text); font-weight: 800; font-size: 15px; pointer-events: none; user-select: none; }
 .layout-machine__sub { fill: var(--muted) !important; font-weight: 500 !important; font-size: 12px !important; }
+.layout-machine__delete { cursor: pointer; filter: drop-shadow(0 8px 12px rgba(127, 29, 29, .35)); }
+.layout-machine__delete circle { fill: #ef4444; stroke: #fecaca; stroke-width: 2; }
+.layout-machine__delete path { stroke: #fff; stroke-width: 2.4; stroke-linecap: round; pointer-events: none; }
+.layout-machine__delete:hover circle, .layout-machine__delete:focus-visible circle { fill: #dc2626; stroke: #fff; }
+body.is-dragging-machine { cursor: grabbing; user-select: none; }
 .flow-line { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; marker-end: url(#arrow); stroke-dasharray: 10 10; animation: dash 1.6s linear infinite; }
 @keyframes dash { to { stroke-dashoffset: -20; } }
 .switch, .split-hint { color: var(--muted); display: flex; align-items: center; gap: .55rem; }

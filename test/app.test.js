@@ -69,6 +69,16 @@ test('layout view exposes researched drag-and-drop industrial machine candidates
   assert.match(layoutMarkup, /draggable="true"/);
 });
 
+test('selected layout machines expose footprint delete and reposition controls', () => {
+  const layoutMarkup = layoutSvg();
+
+  assert.match(layoutMarkup, /data-layout-draggable="true"/);
+  assert.match(layoutMarkup, /aria-label="Select and drag Feedstock Prep Cell"/);
+  assert.match(layoutMarkup, /class="layout-machine__delete"/);
+  assert.match(layoutMarkup, /data-delete-machine-id="prep"/);
+  assert.match(layoutMarkup, /aria-label="Delete Feedstock Prep Cell from layout"/);
+});
+
 test('render profiles and engines produce photorealistic prompts and one-click view plans', () => {
   assert.equal(factoryDesign.renderProfiles.length, 3);
   assert.equal(factoryDesign.renderEngines.length, 3);
