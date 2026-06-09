@@ -1337,7 +1337,7 @@ export function bindApp(root = document.querySelector('#root')) {
         .then((job) => {
           appState.renderStatus = job.rendererAvailable
             ? `${engine.name} render complete: ${job.outputs.join(', ')}`
-            : `${engine.name} scene generated at ${job.jobDir}; install ${job.executable} to execute renders.`;
+            : `${engine.name} scene generated at ${job.jobDir}; ${job.executable} was not found on the server PATH. Install ${job.executable} or set ${job.executableEnvVar} to its full executable path, then restart the server.`;
           renderApp(root);
         })
         .catch((error) => {
