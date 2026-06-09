@@ -2,11 +2,12 @@ import { designMetrics, designToml, envelopeVolume, factoryDesign, factoryStep, 
 import { projectStateFromToml, projectTomlFromState } from './projects.js';
 
 const tabs = [{ id: 'projects', label: 'Projects' }, ...factoryDesign.ui.tabs];
+const defaultMachineIds = factoryDesign.machines.map((machine) => machine.id);
 
 const appState = {
   ...factoryDesign.ui.defaults,
   activeTab: 'projects',
-  selectedMachineId: factoryDesign.machines[0].id,
+  selectedMachineId: '',
   customEnvelope: { ...factoryDesign.ui.defaults.customEnvelope },
   selectedRenderEngineId: factoryDesign.renderEngines[0].id,
   selectedResolutionId: '2k',
@@ -15,7 +16,7 @@ const appState = {
   renderStatus: '',
   placedMachines: [],
   layoutEnvelopes: [],
-  removedMachineIds: [],
+  removedMachineIds: [...defaultMachineIds],
   footprintOverrides: {},
   layoutViewBox: null,
   layoutViewBoxEnvelopeKey: '',
@@ -37,9 +38,18 @@ const layoutMachines = () => [...factoryDesign.machines, ...appState.placedMachi
   .map(withCurrentFootprint);
 
 const findLayoutMachine = (id) => layoutMachines().find((machine) => machine.id === id);
-const getMachine = (id) => findLayoutMachine(id) ?? layoutMachines()[0] ?? factoryDesign.machines[0];
+const getMachine = (id) => findLayoutMachine(id) ?? layoutMachines()[0] ?? null;
 const getCatalogMachine = (id) => factoryDesign.machineCatalog.find((machine) => machine.id === id);
 
+
+const exampleProjectId = 'example-default-workflow';
+const exampleProject = {
+  id: exampleProjectId,
+  name: 'Example: default machine workflow',
+  filename: `${exampleProjectId}.toml`,
+  updatedAt: '',
+  example: true,
+};
 
 const projectStorageKey = 'microfactory-studio-current-project';
 let autosaveTimer;
@@ -60,7 +70,7 @@ async function readJsonResponse(response, fallbackMessage) {
 function baseProjectState(project = {}) {
   return {
     ...factoryDesign.ui.defaults,
-    selectedMachineId: factoryDesign.machines[0].id,
+    selectedMachineId: '',
     customEnvelope: { ...factoryDesign.ui.defaults.customEnvelope },
     selectedRenderEngineId: factoryDesign.renderEngines[0].id,
     selectedResolutionId: '2k',
@@ -69,7 +79,7 @@ function baseProjectState(project = {}) {
     renderStatus: '',
     placedMachines: [],
     layoutEnvelopes: [],
-    removedMachineIds: [],
+    removedMachineIds: [...defaultMachineIds],
     footprintOverrides: {},
     layoutViewBox: null,
     layoutViewBoxEnvelopeKey: '',
@@ -89,7 +99,7 @@ function applyProjectState(project) {
     renderStatus: '',
   });
   if (!findLayoutMachine(appState.selectedMachineId)) {
-    appState.selectedMachineId = layoutMachines()[0]?.id ?? factoryDesign.machines[0].id;
+    appState.selectedMachineId = layoutMachines()[0]?.id ?? '';
   }
 }
 
@@ -106,6 +116,21 @@ async function fetchProjectList() {
 
 async function loadProject(projectId, root = document.querySelector('#root')) {
   if (!projectId || projectRequestInFlight) return;
+  if (projectId === exampleProjectId) {
+    applyProjectState({
+      currentProjectId: exampleProjectId,
+      currentProjectName: exampleProject.name,
+      activeTab: 'summary',
+      selectedMachineId: factoryDesign.machines[0]?.id ?? '',
+      removedMachineIds: [],
+      projects: appState.projects,
+    });
+    appState.projectReady = false;
+    globalThis.localStorage?.setItem(projectStorageKey, exampleProjectId);
+    appState.projectStatus = 'Loaded the read-only example with the default machines and workflow.';
+    renderApp(root);
+    return;
+  }
   projectRequestInFlight = true;
   appState.projectStatus = `Loading ${projectId}.toml…`;
   renderApp(root);
@@ -184,7 +209,9 @@ async function initializeProjects(root = document.querySelector('#root')) {
     appState.projects = await fetchProjectList();
     appState.projectListLoaded = true;
     const storedProjectId = globalThis.localStorage?.getItem(projectStorageKey);
-    const candidate = appState.projects.find((project) => project.id === storedProjectId) ?? appState.projects[0];
+    const candidate = storedProjectId === exampleProjectId
+      ? exampleProject
+      : appState.projects.find((project) => project.id === storedProjectId) ?? appState.projects[0];
     if (candidate) {
       await loadProject(candidate.id, root);
       return;
@@ -295,9 +322,35 @@ function defaultLayoutViewBox() {
   };
 }
 
+
+function isFinitePositiveNumber(value) {
+  return Number.isFinite(Number(value)) && Number(value) > 0;
+}
+
+function isUsableLayoutViewBox(viewBox) {
+  return viewBox
+    && Number.isFinite(Number(viewBox.x))
+    && Number.isFinite(Number(viewBox.y))
+    && isFinitePositiveNumber(viewBox.width)
+    && isFinitePositiveNumber(viewBox.height);
+}
+
+function sanitizedLayoutViewBox(viewBox = defaultLayoutViewBox()) {
+  const fallback = defaultLayoutViewBox();
+  if (!isUsableLayoutViewBox(viewBox)) return fallback;
+  const width = Math.max(Number(viewBox.width), 0.1);
+  const height = Math.max(Number(viewBox.height), 0.1);
+  return {
+    x: Number(viewBox.x),
+    y: Number(viewBox.y),
+    width,
+    height,
+  };
+}
+
 function currentLayoutViewBox() {
   const key = layoutEnvelopeKey();
-  if (!appState.layoutViewBox || appState.layoutViewBoxEnvelopeKey !== key) {
+  if (!isUsableLayoutViewBox(appState.layoutViewBox) || appState.layoutViewBoxEnvelopeKey !== key) {
     appState.layoutViewBox = defaultLayoutViewBox();
     appState.layoutViewBoxEnvelopeKey = key;
   }
@@ -437,12 +490,13 @@ function heroMetrics() {
 
 
 function renderProjects() {
-  const projectCards = appState.projects.length
-    ? appState.projects.map((project) => `
+  const projects = [...appState.projects, exampleProject];
+  const projectCards = projects.length
+    ? projects.map((project) => `
       <article class="project-card ${project.id === appState.currentProjectId ? 'selected' : ''}" data-project-id="${project.id}">
         <div><span class="eyebrow">${project.id}.toml</span><h3>${project.name}</h3></div>
-        <p>${project.updatedAt ? `Last saved ${new Date(project.updatedAt).toLocaleString()}` : 'Ready to load from the project save directory.'}</p>
-        <button type="button" data-load-project-id="${project.id}">${project.id === appState.currentProjectId ? 'Current project' : 'Open project'}</button>
+        <p>${project.example ? 'Read-only starter example with the original default machines and product workflow.' : project.updatedAt ? `Last saved ${new Date(project.updatedAt).toLocaleString()}` : 'Ready to load from the project save directory.'}</p>
+        <button type="button" data-load-project-id="${project.id}">${project.id === appState.currentProjectId ? 'Current project' : project.example ? 'Open example' : 'Open project'}</button>
       </article>`).join('')
     : '<p class="empty-projects">No project .toml files exist in the save directory yet.</p>';
 
@@ -504,6 +558,18 @@ function renderSummary() {
 
 function renderMachines() {
   const selected = getMachine(appState.selectedMachineId);
+  const selectedDetail = selected
+    ? `<span class="eyebrow">Selected asset</span>
+        <h2>${selected.name}</h2>
+        <dl>
+          <div><dt>Inputs</dt><dd>${selected.inputs.join(', ')}</dd></div>
+          <div><dt>Outputs</dt><dd>${selected.outputs.join(', ')}</dd></div>
+          <div><dt>Operator model</dt><dd>${selected.operator}</dd></div>
+          <div><dt>Footprint</dt><dd>${selected.footprint.w}m × ${selected.footprint.h}m</dd></div>
+        </dl>`
+    : `<span class="eyebrow">No machine selected</span>
+        <h2>Start with an empty layout</h2>
+        <p>Create a project and drag equipment from the layout catalog when you are ready to build a workcell.</p>`;
   return `
     <section class="workspace two-column">
       <div>
@@ -513,14 +579,7 @@ function renderMachines() {
         <div class="machine-list">${factoryDesign.machines.map((machine) => machineCard(machine)).join('')}</div>
       </div>
       <aside class="detail-panel">
-        <span class="eyebrow">Selected asset</span>
-        <h2>${selected.name}</h2>
-        <dl>
-          <div><dt>Inputs</dt><dd>${selected.inputs.join(', ')}</dd></div>
-          <div><dt>Outputs</dt><dd>${selected.outputs.join(', ')}</dd></div>
-          <div><dt>Operator model</dt><dd>${selected.operator}</dd></div>
-          <div><dt>Footprint</dt><dd>${selected.footprint.w}m × ${selected.footprint.h}m</dd></div>
-        </dl>
+        ${selectedDetail}
       </aside>
     </section>`;
 }
@@ -609,12 +668,13 @@ function svgViewBox(svg) {
   const [x, y, width, height] = (svg.getAttribute('viewBox') ?? viewBoxAttribute(currentLayoutViewBox()))
     .split(/\s+/)
     .map(Number);
-  return { x, y, width, height };
+  return sanitizedLayoutViewBox({ x, y, width, height });
 }
 
 function pointerToLayout(svg, clientX, clientY) {
   const bounds = svg.getBoundingClientRect();
   const viewBox = svgViewBox(svg);
+  if (!bounds.width || !bounds.height) return { x: viewBox.x, y: viewBox.y };
   const pointerX = viewBox.x + ((clientX - bounds.left) / bounds.width) * viewBox.width;
   const pointerY = viewBox.y + ((clientY - bounds.top) / bounds.height) * viewBox.height;
   return { x: pointerX, y: pointerY };
@@ -676,7 +736,7 @@ function deleteMachineFromLayout(machineId) {
   const { [machineId]: _deletedFootprint, ...footprintOverrides } = appState.footprintOverrides;
   appState.footprintOverrides = footprintOverrides;
   if (appState.selectedMachineId === machineId) {
-    appState.selectedMachineId = layoutMachines()[0]?.id ?? factoryDesign.machines[0].id;
+    appState.selectedMachineId = layoutMachines()[0]?.id ?? '';
   }
 }
 
@@ -713,10 +773,12 @@ function startMachineDrag(root, machineElement, event) {
   window.addEventListener('pointerup', handlePointerUp, { once: true });
 }
 function setLayoutViewBox(svg, viewBox) {
-  appState.layoutViewBox = viewBox;
+  const nextViewBox = sanitizedLayoutViewBox(viewBox);
+  appState.layoutViewBox = nextViewBox;
+  appState.layoutViewBoxEnvelopeKey = layoutEnvelopeKey();
   scheduleProjectAutosave();
-  svg.setAttribute('viewBox', viewBoxAttribute(viewBox));
-  svg.dataset.layoutViewbox = viewBoxAttribute(viewBox);
+  svg.setAttribute('viewBox', viewBoxAttribute(nextViewBox));
+  svg.dataset.layoutViewbox = viewBoxAttribute(nextViewBox);
 }
 
 function zoomLayoutAtPointer(svg, event) {
@@ -748,6 +810,7 @@ function startLayoutPan(root, svg, event) {
 
   const handlePointerMove = (moveEvent) => {
     const bounds = svg.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
     const dx = ((moveEvent.clientX - start.x) / bounds.width) * start.viewBox.width;
     const dy = ((moveEvent.clientY - start.y) / bounds.height) * start.viewBox.height;
     setLayoutViewBox(svg, {
@@ -771,6 +834,13 @@ function startLayoutPan(root, svg, event) {
 
 function renderLayout() {
   const selected = getMachine(appState.selectedMachineId);
+  const inspector = selected
+    ? `<strong>${selected.name}</strong>
+            <span>${selected.type}</span>
+            <p>${selected.inputs.join(' + ')} → ${selected.outputs.join(' + ')}</p>`
+    : `<strong>No machine selected</strong>
+            <span>Empty project layout</span>
+            <p>Drag a machine candidate into the container to begin.</p>`;
   return `
     <section class="workspace">
       <div class="panel-heading large">
@@ -782,9 +852,7 @@ function renderLayout() {
         <div class="layout-stage">
           ${layoutSvg()}
           <aside class="layout-inspector">
-            <strong>${selected.name}</strong>
-            <span>${selected.type}</span>
-            <p>${selected.inputs.join(' + ')} → ${selected.outputs.join(' + ')}</p>
+            ${inspector}
           </aside>
         </div>
       </div>
