@@ -32,58 +32,83 @@ export function envelopeVolume(envelope) {
   return Number((length * width * height).toFixed(1));
 }
 
-function yamlValue(value, depth = 0) {
-  const indent = '  '.repeat(depth);
-  if (Array.isArray(value)) {
-    return value.length
-      ? `\n${value.map((item) => `${indent}- ${typeof item === 'object' ? yamlValue(item, depth + 1).trimStart() : item}`).join('\n')}`
-      : ' []';
-  }
-  if (value && typeof value === 'object') {
-    return `\n${Object.entries(value)
-      .map(([key, item]) => `${indent}${key}:${yamlValue(item, depth + 1)}`)
-      .join('\n')}`;
-  }
-  return ` ${String(value).replace(/:/g, ' -')}`;
+function tomlString(value) {
+  return JSON.stringify(String(value));
 }
 
-export function designYaml({ design = factoryDesign, envelope = getEnvelope('conex-40', design) } = {}) {
-  const exportModel = {
-    project: design.name,
-    product: design.product,
-    throughput: design.throughput,
-    taktTime: design.taktTime,
-    floorSize: design.floorSize,
-    envelope: {
-      id: envelope.id,
-      name: envelope.name,
-      category: envelope.category,
-      dimensions: envelope.dimensions,
-      clearDimensions: envelope.clearDimensions,
-      cadModel: envelope.cadModel,
-    },
-    machines: design.machines.map(({ id, name, type, cycleTime, uptime, energy, footprint }) => ({
-      id,
-      name,
-      type,
-      cycleTimeSeconds: cycleTime,
-      uptimePercent: uptime,
-      energyKw: energy,
-      footprint,
-    })),
-    machineCatalog: design.machineCatalog.map(({ id, name, type, category, buildVolume, sourceUrl, footprint }) => ({
-      id,
-      name,
-      type,
-      category,
-      buildVolume,
-      sourceUrl,
-      footprint,
-    })),
-    flowLinks: design.flowLinks,
-    renderProfiles: design.renderProfiles.map(({ id, title, camera, lighting, materials }) => ({ id, title, camera, lighting, materials })),
-  };
-  return Object.entries(exportModel).map(([key, value]) => `${key}:${yamlValue(value, 1)}`).join('\n');
+function tomlValue(value) {
+  if (Array.isArray(value)) return `[${value.map(tomlValue).join(', ')}]`;
+  if (value && typeof value === 'object') {
+    return `{ ${Object.entries(value).map(([key, item]) => `${key} = ${tomlValue(item)}`).join(', ')} }`;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return tomlString(value);
+}
+
+function tomlField(key, value) {
+  return `${key} = ${tomlValue(value)}`;
+}
+
+export function designToml({ design = factoryDesign, envelope = getEnvelope('conex-40', design) } = {}) {
+  const lines = [
+    tomlField('project', design.name),
+    tomlField('product', design.product),
+    tomlField('throughput', design.throughput),
+    tomlField('taktTime', design.taktTime),
+    tomlField('floorSize', design.floorSize),
+    tomlField('flowLinks', design.flowLinks),
+    '',
+    '[envelope]',
+    tomlField('id', envelope.id),
+    tomlField('name', envelope.name),
+    tomlField('category', envelope.category),
+    tomlField('dimensions', envelope.dimensions),
+    tomlField('clearDimensions', envelope.clearDimensions),
+    tomlField('cadModel', envelope.cadModel),
+    '',
+  ];
+
+  for (const { id, name, type, cycleTime, uptime, energy, footprint } of design.machines) {
+    lines.push(
+      '[[machines]]',
+      tomlField('id', id),
+      tomlField('name', name),
+      tomlField('type', type),
+      tomlField('cycleTimeSeconds', cycleTime),
+      tomlField('uptimePercent', uptime),
+      tomlField('energyKw', energy),
+      tomlField('footprint', footprint),
+      '',
+    );
+  }
+
+  for (const { id, name, type, category, buildVolume, sourceUrl, footprint } of design.machineCatalog) {
+    lines.push(
+      '[[machineCatalog]]',
+      tomlField('id', id),
+      tomlField('name', name),
+      tomlField('type', type),
+      tomlField('category', category),
+      tomlField('buildVolume', buildVolume),
+      tomlField('sourceUrl', sourceUrl),
+      tomlField('footprint', footprint),
+      '',
+    );
+  }
+
+  for (const { id, title, camera, lighting, materials } of design.renderProfiles) {
+    lines.push(
+      '[[renderProfiles]]',
+      tomlField('id', id),
+      tomlField('title', title),
+      tomlField('camera', camera),
+      tomlField('lighting', lighting),
+      tomlField('materials', materials),
+      '',
+    );
+  }
+
+  return lines.join('\n').trimEnd();
 }
 
 export function factoryStep({ design = factoryDesign, envelope = getEnvelope('conex-40', design) } = {}) {
@@ -129,7 +154,7 @@ export function reportPdf({ design = factoryDesign, envelope = getEnvelope('cone
     `Machines: ${metrics.machineCount}`,
     `Total load: ${metrics.totalEnergy} kW`,
     `Bottleneck: ${metrics.bottleneck}`,
-    'Includes: STEP assembly, YAML design, render-board SVG, and this PDF report.',
+    'Includes: STEP assembly, TOML design, render-board SVG, and this PDF report.',
   ];
   const text = lines.map((line, index) => `BT /F1 14 Tf 72 ${760 - index * 28} Td (${line.replace(/[()]/g, '')}) Tj ET`).join('\n');
   return `%PDF-1.4

@@ -8,7 +8,7 @@ A zero-dependency web application for designing and reasoning about a compact mi
 - **Envelope** — container and building-envelope selector with Conex defaults, custom dimensions, generated CAD previews, and CAD model metadata.
 - **Flow** — text and visual graph representations of feedstock-to-finished-product transformations with an adjustable split bar.
 - **Renders** — photorealistic render-brief cards for turning the design into visual direction.
-- **Export** — client-side export actions for a whole-factory `.step`, design `.yaml`, render-board `.svg`, and `.pdf` report package.
+- **Export** — client-side export actions for a whole-factory `.step`, design `.toml`, render-board `.svg`, and `.pdf` report package.
 
 
 ## Editable TOML configuration
