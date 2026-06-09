@@ -7,11 +7,21 @@ const appState = {
   selectedMachineId: factoryDesign.machines[0].id,
   customEnvelope: { ...factoryDesign.ui.defaults.customEnvelope },
   placedMachines: [],
+  removedMachineIds: [],
+  footprintOverrides: {},
 };
 
-const layoutMachines = () => [...factoryDesign.machines, ...appState.placedMachines];
+const withCurrentFootprint = (machine) => ({
+  ...machine,
+  footprint: { ...machine.footprint, ...appState.footprintOverrides[machine.id] },
+});
 
-const getMachine = (id) => layoutMachines().find((machine) => machine.id === id) ?? factoryDesign.machines[0];
+const layoutMachines = () => [...factoryDesign.machines, ...appState.placedMachines]
+  .filter((machine) => !appState.removedMachineIds.includes(machine.id))
+  .map(withCurrentFootprint);
+
+const findLayoutMachine = (id) => layoutMachines().find((machine) => machine.id === id);
+const getMachine = (id) => findLayoutMachine(id) ?? layoutMachines()[0] ?? factoryDesign.machines[0];
 const getCatalogMachine = (id) => factoryDesign.machineCatalog.find((machine) => machine.id === id);
 
 const selectedEnvelope = () => {
@@ -55,21 +65,38 @@ function layoutSvg({ compact = false } = {}) {
   const machines = layoutMachines()
     .map((machine) => {
       const { x, y, w, h } = machine.footprint;
-      const selected = machine.id === appState.selectedMachineId ? ' selected' : '';
+      const selected = machine.id === appState.selectedMachineId;
+      const selectedClass = selected ? ' selected' : '';
+      const rectX = x * scaleX;
+      const rectY = y * scaleY;
+      const rectWidth = w * scaleX;
+      const rectHeight = h * scaleY;
+      const deleteX = rectX + rectWidth - 12;
+      const deleteY = rectY + 12;
+      const deleteControl = selected && !compact
+        ? `<g class="layout-machine__delete" data-delete-machine-id="${machine.id}" tabindex="0" role="button" aria-label="Delete ${machine.name} from layout">
+            <circle cx="${deleteX}" cy="${deleteY}" r="12" />
+            <path d="M ${deleteX - 4} ${deleteY - 4} L ${deleteX + 4} ${deleteY + 4} M ${deleteX + 4} ${deleteY - 4} L ${deleteX - 4} ${deleteY + 4}" />
+          </g>`
+        : '';
       return `
-        <g class="layout-machine${selected}" data-machine-id="${machine.id}" tabindex="0" role="button" aria-label="Select ${machine.name}">
-          <rect x="${x * scaleX}" y="${y * scaleY}" width="${w * scaleX}" height="${h * scaleY}" rx="14" />
+        <g class="layout-machine${selectedClass}" data-machine-id="${machine.id}" data-layout-draggable="true" tabindex="0" role="button" aria-label="Select and drag ${machine.name}">
+          <rect x="${rectX}" y="${rectY}" width="${rectWidth}" height="${rectHeight}" rx="14" />
           <text x="${(x + w / 2) * scaleX}" y="${(y + h / 2) * scaleY - 5}" text-anchor="middle">${machine.name.split(' ')[0]}</text>
           <text class="layout-machine__sub" x="${(x + w / 2) * scaleX}" y="${(y + h / 2) * scaleY + 17}" text-anchor="middle">${machine.cycleTime}s takt</text>
-        </g>`;
+        </g>
+        ${deleteControl}`;
     })
     .join('');
 
   const flows = appState.showFlow
     ? factoryDesign.flowLinks
         .map(([fromId, toId]) => {
-          const from = getMachine(fromId).footprint;
-          const to = getMachine(toId).footprint;
+          const fromMachine = findLayoutMachine(fromId);
+          const toMachine = findLayoutMachine(toId);
+          if (!fromMachine || !toMachine) return '';
+          const from = fromMachine.footprint;
+          const to = toMachine.footprint;
           return `<path class="flow-line" d="M ${(from.x + from.w) * scaleX} ${(from.y + from.h / 2) * scaleY} C ${(from.x + from.w + 1.5) * scaleX} ${(from.y + from.h / 2) * scaleY}, ${(to.x - 1.5) * scaleX} ${(to.y + to.h / 2) * scaleY}, ${to.x * scaleX} ${(to.y + to.h / 2) * scaleY}" />`;
         })
         .join('')
@@ -270,6 +297,91 @@ function dropMachineOnLayout(root, catalogMachineId, clientX, clientY) {
   appState.placedMachines = [...appState.placedMachines, placedMachine];
   appState.selectedMachineId = placedMachine.id;
   renderApp(root);
+}
+
+
+function layoutScales() {
+  const envelope = selectedEnvelope();
+  const viewWidth = 640;
+  const viewHeight = 380;
+  return {
+    viewWidth,
+    viewHeight,
+    scaleX: viewWidth / Math.max(factoryDesign.floorSize.width, envelope.dimensions.length),
+    scaleY: viewHeight / Math.max(factoryDesign.floorSize.height, envelope.dimensions.width),
+  };
+}
+
+function pointerToLayout(svg, clientX, clientY) {
+  const bounds = svg.getBoundingClientRect();
+  const { viewWidth, viewHeight, scaleX, scaleY } = layoutScales();
+  const pointerX = ((clientX - bounds.left) / bounds.width) * viewWidth;
+  const pointerY = ((clientY - bounds.top) / bounds.height) * viewHeight;
+  return { x: pointerX / scaleX, y: pointerY / scaleY };
+}
+
+function clampedFootprintPosition(machine, x, y) {
+  return {
+    x: Number(Math.min(Math.max(x, 0), factoryDesign.floorSize.width - machine.footprint.w).toFixed(2)),
+    y: Number(Math.min(Math.max(y, 0), factoryDesign.floorSize.height - machine.footprint.h).toFixed(2)),
+  };
+}
+
+function updateMachineFootprint(machineId, x, y) {
+  const machine = findLayoutMachine(machineId);
+  if (!machine) return;
+  const position = clampedFootprintPosition(machine, x, y);
+  appState.footprintOverrides = {
+    ...appState.footprintOverrides,
+    [machineId]: { ...machine.footprint, ...position },
+  };
+}
+
+function deleteMachineFromLayout(machineId) {
+  const remainingPlacedMachines = appState.placedMachines.filter((machine) => machine.id !== machineId);
+  const removedPlacedMachine = remainingPlacedMachines.length !== appState.placedMachines.length;
+  appState.placedMachines = remainingPlacedMachines;
+  if (!removedPlacedMachine && factoryDesign.machines.some((machine) => machine.id === machineId)) {
+    appState.removedMachineIds = [...new Set([...appState.removedMachineIds, machineId])];
+  }
+
+  const { [machineId]: _deletedFootprint, ...footprintOverrides } = appState.footprintOverrides;
+  appState.footprintOverrides = footprintOverrides;
+  if (appState.selectedMachineId === machineId) {
+    appState.selectedMachineId = layoutMachines()[0]?.id ?? factoryDesign.machines[0].id;
+  }
+}
+
+function startMachineDrag(root, machineElement, event) {
+  const svg = machineElement.closest('.layout-canvas');
+  const machineId = machineElement.dataset.machineId;
+  const machine = findLayoutMachine(machineId);
+  if (!svg || !machine || event.target.closest('[data-delete-machine-id]')) return;
+
+  event.preventDefault();
+  machineElement.setPointerCapture?.(event.pointerId);
+  appState.selectedMachineId = machineId;
+  const pointer = pointerToLayout(svg, event.clientX, event.clientY);
+  const offset = { x: pointer.x - machine.footprint.x, y: pointer.y - machine.footprint.y };
+  document.body.classList.add('is-dragging-machine');
+  renderApp(root);
+
+  const handlePointerMove = (moveEvent) => {
+    const nextPointer = pointerToLayout(root.querySelector('.layout-canvas') ?? svg, moveEvent.clientX, moveEvent.clientY);
+    updateMachineFootprint(machineId, nextPointer.x - offset.x, nextPointer.y - offset.y);
+    renderApp(root);
+  };
+
+  const handlePointerUp = () => {
+    document.body.classList.remove('is-dragging-machine');
+    machineElement.releasePointerCapture?.(event.pointerId);
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+    renderApp(root);
+  };
+
+  window.addEventListener('pointermove', handlePointerMove);
+  window.addEventListener('pointerup', handlePointerUp, { once: true });
 }
 
 function renderLayout() {
@@ -539,6 +651,13 @@ export function bindApp(root = document.querySelector('#root')) {
       return;
     }
 
+    const deleteMachineTarget = event.target.closest('[data-delete-machine-id]');
+    if (deleteMachineTarget) {
+      deleteMachineFromLayout(deleteMachineTarget.dataset.deleteMachineId);
+      renderApp(root);
+      return;
+    }
+
     const target = event.target.closest('[data-tab-target], [data-machine-id], [data-envelope-id]');
     if (!target) return;
     if (target.dataset.tabTarget) {
@@ -574,10 +693,24 @@ export function bindApp(root = document.querySelector('#root')) {
 
   root.addEventListener('pointerdown', (event) => {
     const divider = event.target.closest('[data-split-divider]');
-    if (divider) startSplitDrag(root, divider, event);
+    if (divider) {
+      startSplitDrag(root, divider, event);
+      return;
+    }
+
+    const machine = event.target.closest('[data-layout-draggable]');
+    if (machine) startMachineDrag(root, machine, event);
   });
 
   root.addEventListener('keydown', (event) => {
+    const deleteMachineTarget = event.target.closest('[data-delete-machine-id]');
+    if (deleteMachineTarget && ['Enter', ' '].includes(event.key)) {
+      event.preventDefault();
+      deleteMachineFromLayout(deleteMachineTarget.dataset.deleteMachineId);
+      renderApp(root);
+      return;
+    }
+
     const divider = event.target.closest('[data-split-divider]');
     if (!divider || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
 
