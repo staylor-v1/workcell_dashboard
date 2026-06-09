@@ -1,4 +1,4 @@
-import { designMetrics, designYaml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, renderBoardSvg, renderPrompt, reportPdf } from './data.js';
+import { designMetrics, designToml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, renderBoardSvg, renderPrompt, reportPdf } from './data.js';
 
 const tabs = factoryDesign.ui.tabs;
 
@@ -416,7 +416,7 @@ function renderExport() {
     <section class="workspace export-view">
       <span class="eyebrow">Design handoff</span>
       <h1>Export the whole factory package</h1>
-      <p>Generate neutral CAD, source YAML, photorealistic render boards, and a PDF report from the shared machine, flow, render, and envelope model.</p>
+      <p>Generate neutral CAD, source TOML, photorealistic render boards, and a PDF report from the shared machine, flow, render, and envelope model.</p>
       <aside class="export-summary">
         <strong>${factoryDesign.name}</strong>
         <span>${envelope.name}</span>
@@ -425,7 +425,7 @@ function renderExport() {
       <div class="export-grid">${factoryDesign.exportPackages.map(exportCard).join('')}</div>
       <div class="export-manifest">
         <h2>Package manifest</h2>
-        <pre>${designYaml({ envelope }).split('\n').slice(0, 18).join('\n')}\n...</pre>
+        <pre>${designToml({ envelope }).split('\n').slice(0, 18).join('\n')}\n...</pre>
       </div>
     </section>`;
 }
@@ -445,7 +445,7 @@ function handleExport(kind) {
   const slug = factoryDesign.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const exporters = {
     step: [`${slug}.step`, factoryStep({ envelope }), 'model/step'],
-    yaml: [`${slug}.yaml`, designYaml({ envelope }), 'text/yaml'],
+    toml: [`${slug}.toml`, designToml({ envelope }), 'text/plain'],
     images: [`${slug}-render-board.svg`, renderBoardSvg({ envelope }), 'image/svg+xml'],
     pdf: [`${slug}-report.pdf`, reportPdf({ envelope }), 'application/pdf'],
   };

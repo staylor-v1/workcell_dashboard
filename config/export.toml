@@ -13,10 +13,10 @@ extension = ".step"
 detail = "Whole-factory CAD assembly with envelope, floor, machines, utility keep-outs, and product-flow reference geometry."
 
 [[export_packages]]
-id = "yaml"
-label = "Design YAML"
-extension = ".yaml"
-detail = "Human-readable design source of truth for machines, layout, envelope, flow, renders, and export metadata."
+id = "toml"
+label = "Design TOML"
+extension = ".toml"
+detail = "Human-readable TOML design source of truth for machines, layout, envelope, flow, renders, and export metadata."
 
 [[export_packages]]
 id = "images"

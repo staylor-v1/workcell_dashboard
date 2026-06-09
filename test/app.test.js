@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { configSourceFiles, designYaml, factoryDesign, factoryStep, designMetrics, renderBoardSvg, renderPrompt, reportPdf } from '../src/data.js';
+import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, renderBoardSvg, renderPrompt, reportPdf } from '../src/data.js';
 import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderLayout, tabs } from '../src/app.js';
+import { parseToml } from '../src/toml.js';
 
 test('factory design contains required coordinated views loaded from TOML source files', () => {
   assert.deepEqual(tabs.map((tab) => tab.id), ['summary', 'machines', 'layout', 'envelope', 'flow', 'renders', 'export']);
@@ -81,19 +82,20 @@ test('envelope tab provides researched defaults, custom dimensions, and CAD prev
   assert.match(cadMarkup, /CAD preview for 40ft Conex/);
 });
 
-test('export tab generates STEP, YAML, render-board SVG, and PDF package content', () => {
+test('export tab generates STEP, TOML, render-board SVG, and PDF package content', () => {
   const exportMarkup = renderExport();
   const step = factoryStep();
-  const yaml = designYaml();
+  const toml = designToml();
   const svg = renderBoardSvg();
   const pdf = reportPdf();
 
   assert.match(exportMarkup, /Download \.step/);
-  assert.match(exportMarkup, /Download \.yaml/);
+  assert.match(exportMarkup, /Download \.toml/);
   assert.match(exportMarkup, /Download \.svg/);
   assert.match(exportMarkup, /Download \.pdf/);
   assert.match(step, /ISO-10303-21/);
-  assert.match(yaml, /envelope:/);
+  assert.match(toml, /\[envelope\]/);
+  assert.equal(parseToml(toml).envelope.id, factoryDesign.envelopeOptions[0].id);
   assert.match(svg, /Photorealistic render board/);
   assert.match(pdf, /%PDF-1\.4/);
 });
