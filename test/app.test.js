@@ -4,10 +4,12 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, getRenderEngine, getRenderResolution, omniversePackageFiles, omniverseUsd, renderBoardSvg, renderJobManifest, renderPrompt, renderViewPlan, reportPdf } from '../src/data.js';
-import { appState, envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderFlow, renderLayout, renderRenders, tabs, view } from '../src/app.js';
+import { appState, envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderFlow, renderLayout, renderRenders, tabs, view, readJsonResponse } from '../src/app.js';
 import { parseToml } from '../src/toml.js';
 import { projectStateFromToml, projectTomlFromState, slugifyProjectName } from '../src/projects.js';
+import { createProjectApi } from '../project-api.mjs';
 
 test('factory design contains required coordinated views loaded from TOML source files', () => {
   assert.deepEqual(tabs.map((tab) => tab.id), ['projects', 'summary', 'machines', 'layout', 'envelope', 'flow', 'renders', 'export']);
@@ -35,14 +37,13 @@ test('factory design contains required coordinated views loaded from TOML source
 });
 
 
-
 test('project dashboard lists TOML-backed projects and serializes autosave state', () => {
   const previousState = { ...appState, customEnvelope: { ...appState.customEnvelope }, customResolution: { ...appState.customResolution } };
   Object.assign(appState, {
-    currentProjectId: 'vista-workcell',
-    currentProjectName: 'Vista Workcell',
-    projectStatus: 'Autosaved Vista Workcell.',
-    projects: [{ id: 'vista-workcell', name: 'Vista Workcell', filename: 'vista-workcell.toml', updatedAt: '2026-06-09T00:00:00.000Z' }],
+    currentProjectId: 'demo-workcell',
+    currentProjectName: 'Demo Workcell',
+    projectStatus: 'Autosaved Demo Workcell.',
+    projects: [{ id: 'demo-workcell', name: 'Demo Workcell', filename: 'demo-workcell.toml', updatedAt: '2026-06-09T00:00:00.000Z' }],
     projectReady: true,
     activeTab: 'projects',
     selectedEnvelopeId: 'custom',
@@ -63,20 +64,62 @@ test('project dashboard lists TOML-backed projects and serializes autosave state
   const restored = projectStateFromToml(toml, previousState);
 
   assert.match(markup, /Project dashboard/);
-  assert.match(markup, /vista-workcell\.toml/);
+  assert.match(markup, /demo-workcell\.toml/);
   assert.match(markup, /data-project-create/);
-  assert.match(markup, /data-load-project-id="vista-workcell"/);
+  assert.match(markup, /data-load-project-id="demo-workcell"/);
   assert.match(toml, /\[project\]/);
   assert.match(toml, /\[\[placedMachines\]\]/);
   assert.match(toml, /\[\[footprintOverrides\]\]/);
-  assert.equal(restored.currentProjectId, 'vista-workcell');
-  assert.equal(restored.currentProjectName, 'Vista Workcell');
+  assert.equal(restored.currentProjectId, 'demo-workcell');
+  assert.equal(restored.currentProjectName, 'Demo Workcell');
   assert.equal(restored.customEnvelope.length, 9.5);
   assert.equal(restored.placedMachines[0].catalogId, factoryDesign.machineCatalog[0].id);
   assert.equal(restored.footprintOverrides.prep.x, 0.5);
-  assert.equal(slugifyProjectName('Vista Project!'), 'vista-project');
+  assert.equal(slugifyProjectName('Factory Project!'), 'factory-project');
 
   Object.assign(appState, previousState);
+});
+
+
+test('project API creates TOML projects with JSON responses', async () => {
+  const projectDir = await mkdtemp(join(tmpdir(), 'workcell-projects-'));
+  const handleProjectsRequest = createProjectApi({ root: process.cwd(), projectDir });
+  const server = createServer(async (request, response) => {
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    if (await handleProjectsRequest(request, response, url)) return;
+    response.writeHead(404);
+    response.end();
+  });
+
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const { port } = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/api/projects`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'API Smoke Project' }),
+    });
+    const result = await response.json();
+    const saved = await readFile(join(projectDir, 'api-smoke-project.toml'), 'utf8');
+
+    assert.equal(response.status, 201);
+    assert.equal(result.id, 'api-smoke-project');
+    assert.match(saved, /name = "API Smoke Project"/);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('project API responses report empty or invalid JSON bodies clearly', async () => {
+  await assert.rejects(
+    readJsonResponse(new Response('', { status: 404 }), 'Project create failed'),
+    /empty response from server/,
+  );
+
+  await assert.rejects(
+    readJsonResponse(new Response('<h1>Not found</h1>', { status: 404 }), 'Project create failed'),
+    /server returned non-JSON response/,
+  );
 });
 
 test('design metrics identify the bottleneck from shared machine data', () => {

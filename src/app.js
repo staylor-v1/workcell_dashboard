@@ -44,6 +44,18 @@ const projectStorageKey = 'microfactory-studio-current-project';
 let autosaveTimer;
 let projectRequestInFlight = false;
 
+async function readJsonResponse(response, fallbackMessage) {
+  const body = await response.text();
+  if (!body.trim()) {
+    throw new Error(`${fallbackMessage}: empty response from server. Start the app with npm run dev or npm run server so /api/projects is available.`);
+  }
+  try {
+    return JSON.parse(body);
+  } catch (error) {
+    throw new Error(`${fallbackMessage}: server returned non-JSON response (${error.message})`);
+  }
+}
+
 function baseProjectState(project = {}) {
   return {
     ...factoryDesign.ui.defaults,
@@ -85,8 +97,9 @@ function projectSavePayload() {
 
 async function fetchProjectList() {
   const response = await fetch('/api/projects');
-  if (!response.ok) throw new Error(`Project list failed: ${response.status}`);
-  return response.json();
+  const result = await readJsonResponse(response, 'Project list failed');
+  if (!response.ok) throw new Error(result.error ?? `Project list failed: ${response.status}`);
+  return result;
 }
 
 async function loadProject(projectId, root = document.querySelector('#root')) {
@@ -96,7 +109,7 @@ async function loadProject(projectId, root = document.querySelector('#root')) {
   renderApp(root);
   try {
     const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}`);
-    const result = await response.json();
+    const result = await readJsonResponse(response, `Unable to load ${projectId}`);
     if (!response.ok) throw new Error(result.error ?? `Unable to load ${projectId}`);
     const project = projectStateFromToml(result.contents, { currentProjectId: projectId });
     applyProjectState({ ...project, currentProjectId: projectId });
@@ -119,7 +132,7 @@ async function saveProjectNow() {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ contents }),
   });
-  const result = await response.json();
+  const result = await readJsonResponse(response, 'Autosave failed');
   if (!response.ok) throw new Error(result.error ?? 'Autosave failed');
   appState.projectStatus = `Autosaved ${appState.currentProjectName} at ${new Date(result.updatedAt).toLocaleTimeString()}.`;
 }
@@ -147,7 +160,7 @@ async function createProject(name, root = document.querySelector('#root')) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name: projectName }),
     });
-    const result = await response.json();
+    const result = await readJsonResponse(response, 'Project create failed');
     if (!response.ok) throw new Error(result.error ?? 'Project create failed');
     applyProjectState({
       currentProjectId: result.id,
@@ -389,7 +402,7 @@ function renderProjects() {
           <p>Projects are saved as TOML files in the server save directory. Open an existing project or create a new one, then layout, envelope, render, and UI changes autosave as you work.</p>
         </div>
         <form class="project-create" data-project-create>
-          <label>New project name<input name="projectName" autocomplete="off" placeholder="Vista-style workcell concept" /></label>
+          <label>New project name<input name="projectName" autocomplete="off" placeholder="New factory workcell concept" /></label>
           <button type="submit">Create project</button>
         </form>
       </div>
@@ -1332,4 +1345,4 @@ export function bindApp(root = document.querySelector('#root')) {
   });
 }
 
-export { appState, tabs, layoutSvg, flowGraph, renderFlow, renderLayout, renderRenders, renderEnvelope, renderExport, envelopeCadSvg };
+export { appState, tabs, readJsonResponse, layoutSvg, flowGraph, renderFlow, renderLayout, renderRenders, renderEnvelope, renderExport, envelopeCadSvg };
