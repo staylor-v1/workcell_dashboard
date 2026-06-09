@@ -110,21 +110,22 @@ dt { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-s
 dd { margin: .2rem 0 0; line-height: 1.5; }
 
 .layout-shell { position: relative; border-radius: 28px; overflow: hidden; background: rgba(2, 6, 23, .5); border: 1px solid var(--line); }
-.layout-canvas { display: block; width: 100%; height: min(62vh, 640px); min-height: 360px; }
+.layout-canvas { display: block; width: 100%; height: min(62vh, 640px); min-height: 360px; cursor: grab; touch-action: none; }
 .layout-shell.compact .layout-canvas { height: 285px; min-height: 220px; }
-.floor-boundary { fill: rgba(15, 23, 42, .45); stroke: rgba(148, 163, 184, .26); stroke-width: 2; }
+.floor-boundary { fill: rgba(15, 23, 42, .45); stroke: rgba(148, 163, 184, .26); stroke-width: .045; vector-effect: non-scaling-stroke; }
 .layout-machine { cursor: grab; touch-action: none; }
 .layout-machine:active { cursor: grabbing; }
-.layout-machine rect { fill: rgba(134, 168, 255, .18); stroke: rgba(134, 168, 255, .7); stroke-width: 2; filter: drop-shadow(0 12px 18px rgba(0,0,0,.25)); }
+.layout-machine rect { fill: rgba(134, 168, 255, .18); stroke: rgba(134, 168, 255, .7); stroke-width: .045; vector-effect: non-scaling-stroke; filter: drop-shadow(0 12px 18px rgba(0,0,0,.25)); }
 .layout-machine.selected rect { fill: rgba(62, 231, 198, .24); stroke: var(--accent); }
-.layout-machine text { fill: var(--text); font-weight: 800; font-size: 15px; pointer-events: none; user-select: none; }
-.layout-machine__sub { fill: var(--muted) !important; font-weight: 500 !important; font-size: 12px !important; }
+.layout-machine text { fill: var(--text); font-weight: 800; font-size: .28px; pointer-events: none; user-select: none; }
+.layout-machine__sub { fill: var(--muted) !important; font-weight: 500 !important; font-size: .22px !important; }
 .layout-machine__delete { cursor: pointer; filter: drop-shadow(0 8px 12px rgba(127, 29, 29, .35)); }
 .layout-machine__delete circle { fill: #ef4444; stroke: #fecaca; stroke-width: 2; }
-.layout-machine__delete path { stroke: #fff; stroke-width: 2.4; stroke-linecap: round; pointer-events: none; }
+.layout-machine__delete path { stroke: #fff; stroke-width: .035; stroke-linecap: round; pointer-events: none; vector-effect: non-scaling-stroke; }
 .layout-machine__delete:hover circle, .layout-machine__delete:focus-visible circle { fill: #dc2626; stroke: #fff; }
-body.is-dragging-machine { cursor: grabbing; user-select: none; }
-.flow-line { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; marker-end: url(#arrow); stroke-dasharray: 10 10; animation: dash 1.6s linear infinite; }
+body.is-dragging-machine, body.is-panning-layout { cursor: grabbing; user-select: none; }
+body.is-panning-layout .layout-canvas { cursor: grabbing; }
+.flow-line { fill: none; stroke: var(--accent); stroke-width: .08; stroke-linecap: round; marker-end: url(#arrow); stroke-dasharray: .18 .18; animation: dash 1.6s linear infinite; vector-effect: non-scaling-stroke; }
 @keyframes dash { to { stroke-dashoffset: -20; } }
 .switch, .split-hint { color: var(--muted); display: flex; align-items: center; gap: .55rem; }
 .switch input { accent-color: var(--accent); width: 1.2rem; height: 1.2rem; }
@@ -213,8 +214,8 @@ body.is-dragging-machine { cursor: grabbing; user-select: none; }
   .flow-graph { grid-template-columns: 1fr; }
 }
 
-.envelope-boundary { fill: rgba(62, 231, 198, .055); stroke: rgba(62, 231, 198, .85); stroke-width: 3; stroke-dasharray: 12 8; }
-.envelope-label { fill: var(--accent); font-size: 13px; font-weight: 900; }
+.envelope-boundary { fill: rgba(62, 231, 198, .055); stroke: rgba(62, 231, 198, .85); stroke-width: .06; stroke-dasharray: .24 .16; vector-effect: non-scaling-stroke; }
+.envelope-label { fill: var(--accent); font-size: .32px; font-weight: 900; }
 .envelope-view > p, .export-view > p { max-width: 980px; color: var(--muted); font-size: 1.02rem; }
 .envelope-grid, .export-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-top: 1.2rem; }
 .envelope-card, .export-card { border: 1px solid var(--line); border-radius: 24px; padding: 1rem; background: rgba(2, 6, 23, .38); cursor: pointer; transition: border-color .2s ease, transform .2s ease, background .2s ease; }

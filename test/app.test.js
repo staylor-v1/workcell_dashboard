@@ -44,6 +44,8 @@ test('layout and flow render from the same machine and flow model', () => {
   const layoutMarkup = layoutSvg();
   const graphMarkup = flowGraph();
   assert.match(layoutMarkup, /Top down microfactory layout/);
+  assert.match(layoutMarkup, /data-layout-pan-zoom="true"/);
+  assert.match(layoutMarkup, /viewBox="-0\.12 -0\.12 12\.432 2\.678/);
   assert.match(layoutMarkup, /Precision Molding Island|Precision/);
   assert.match(graphMarkup, /Finished tested product/);
 });
@@ -134,6 +136,16 @@ test('envelope tab provides researched defaults, custom dimensions, and CAD prev
   assert.match(envelopeMarkup, /Custom envelope/);
   assert.match(envelopeMarkup, /data-custom-dimension="length"/);
   assert.match(cadMarkup, /CAD preview for 40ft Conex/);
+  assert.equal(factoryDesign.envelopeOptions[0].cadModel.assetPath, 'assets/envelopes/conex-40.step');
+});
+
+test('envelope STEP assets exist for every selectable envelope option', async () => {
+  for (const envelope of factoryDesign.envelopeOptions) {
+    const step = await readFile(envelope.cadModel.assetPath, 'utf8');
+    assert.match(step, /ISO-10303-21/);
+    assert.ok(step.includes(envelope.id));
+    assert.match(step, /cad_source/);
+  }
 });
 
 test('export tab generates Omniverse USD, STEP, TOML, render-board SVG, and PDF package content', () => {
