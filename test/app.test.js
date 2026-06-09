@@ -5,11 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, getRenderEngine, getRenderResolution, omniversePackageFiles, omniverseUsd, renderBoardSvg, renderJobManifest, renderPrompt, renderViewPlan, reportPdf } from '../src/data.js';
-import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderFlow, renderLayout, renderRenders, tabs } from '../src/app.js';
+import { appState, envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderFlow, renderLayout, renderRenders, tabs, view } from '../src/app.js';
 import { parseToml } from '../src/toml.js';
+import { projectStateFromToml, projectTomlFromState, slugifyProjectName } from '../src/projects.js';
 
 test('factory design contains required coordinated views loaded from TOML source files', () => {
-  assert.deepEqual(tabs.map((tab) => tab.id), ['summary', 'machines', 'layout', 'envelope', 'flow', 'renders', 'export']);
+  assert.deepEqual(tabs.map((tab) => tab.id), ['projects', 'summary', 'machines', 'layout', 'envelope', 'flow', 'renders', 'export']);
   assert.deepEqual(configSourceFiles, [
     'config/factory.toml',
     'config/machines.toml',
@@ -31,6 +32,51 @@ test('factory design contains required coordinated views loaded from TOML source
   assert.deepEqual(factoryDesign.renderViews.map((view) => view.id), ['top-down', 'container-door', 'orthographic']);
   assert.deepEqual(factoryDesign.renderResolutions.map((resolution) => resolution.id), ['1k', '2k', '4k', 'custom']);
   assert.equal(factoryDesign.machines[0].assetPath, 'assets/machines/prep.step');
+});
+
+
+
+test('project dashboard lists TOML-backed projects and serializes autosave state', () => {
+  const previousState = { ...appState, customEnvelope: { ...appState.customEnvelope }, customResolution: { ...appState.customResolution } };
+  Object.assign(appState, {
+    currentProjectId: 'vista-workcell',
+    currentProjectName: 'Vista Workcell',
+    projectStatus: 'Autosaved Vista Workcell.',
+    projects: [{ id: 'vista-workcell', name: 'Vista Workcell', filename: 'vista-workcell.toml', updatedAt: '2026-06-09T00:00:00.000Z' }],
+    projectReady: true,
+    activeTab: 'projects',
+    selectedEnvelopeId: 'custom',
+    customEnvelope: { length: 9.5, width: 3.2, height: 2.8 },
+    placedMachines: [{
+      ...factoryDesign.machineCatalog[0],
+      id: 'eos-m290-instance',
+      catalogId: factoryDesign.machineCatalog[0].id,
+      name: 'EOS M290 Instance',
+      status: 'Placed',
+      footprint: { x: 1.1, y: 0.8, w: 2.5, h: 1.3 },
+    }],
+    footprintOverrides: { prep: { x: 0.5, y: 0.25, w: 1.4, h: 0.9 } },
+  });
+
+  const markup = view();
+  const toml = projectTomlFromState(appState);
+  const restored = projectStateFromToml(toml, previousState);
+
+  assert.match(markup, /Project dashboard/);
+  assert.match(markup, /vista-workcell\.toml/);
+  assert.match(markup, /data-project-create/);
+  assert.match(markup, /data-load-project-id="vista-workcell"/);
+  assert.match(toml, /\[project\]/);
+  assert.match(toml, /\[\[placedMachines\]\]/);
+  assert.match(toml, /\[\[footprintOverrides\]\]/);
+  assert.equal(restored.currentProjectId, 'vista-workcell');
+  assert.equal(restored.currentProjectName, 'Vista Workcell');
+  assert.equal(restored.customEnvelope.length, 9.5);
+  assert.equal(restored.placedMachines[0].catalogId, factoryDesign.machineCatalog[0].id);
+  assert.equal(restored.footprintOverrides.prep.x, 0.5);
+  assert.equal(slugifyProjectName('Vista Project!'), 'vista-project');
+
+  Object.assign(appState, previousState);
 });
 
 test('design metrics identify the bottleneck from shared machine data', () => {

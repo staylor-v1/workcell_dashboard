@@ -1,9 +1,11 @@
 import { designMetrics, designToml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, getRenderEngine, getRenderResolution, normalizedRenderResolution, omniversePackageFiles, renderBoardSvg, renderJobManifest, renderPrompt, renderViewPlan, reportPdf } from './data.js';
+import { projectStateFromToml, projectTomlFromState } from './projects.js';
 
-const tabs = factoryDesign.ui.tabs;
+const tabs = [{ id: 'projects', label: 'Projects' }, ...factoryDesign.ui.tabs];
 
 const appState = {
   ...factoryDesign.ui.defaults,
+  activeTab: 'projects',
   selectedMachineId: factoryDesign.machines[0].id,
   customEnvelope: { ...factoryDesign.ui.defaults.customEnvelope },
   selectedRenderEngineId: factoryDesign.renderEngines[0].id,
@@ -16,6 +18,12 @@ const appState = {
   footprintOverrides: {},
   layoutViewBox: null,
   layoutViewBoxEnvelopeKey: '',
+  currentProjectId: '',
+  currentProjectName: '',
+  projects: [],
+  projectStatus: 'Choose or create a project to enable autosave.',
+  projectReady: false,
+  projectListLoaded: false,
 };
 
 const withCurrentFootprint = (machine) => ({
@@ -30,6 +38,148 @@ const layoutMachines = () => [...factoryDesign.machines, ...appState.placedMachi
 const findLayoutMachine = (id) => layoutMachines().find((machine) => machine.id === id);
 const getMachine = (id) => findLayoutMachine(id) ?? layoutMachines()[0] ?? factoryDesign.machines[0];
 const getCatalogMachine = (id) => factoryDesign.machineCatalog.find((machine) => machine.id === id);
+
+
+const projectStorageKey = 'microfactory-studio-current-project';
+let autosaveTimer;
+let projectRequestInFlight = false;
+
+function baseProjectState(project = {}) {
+  return {
+    ...factoryDesign.ui.defaults,
+    selectedMachineId: factoryDesign.machines[0].id,
+    customEnvelope: { ...factoryDesign.ui.defaults.customEnvelope },
+    selectedRenderEngineId: factoryDesign.renderEngines[0].id,
+    selectedResolutionId: '2k',
+    customResolution: { ...factoryDesign.renderResolutions.find((resolution) => resolution.id === 'custom') },
+    showCustomResolutionModal: false,
+    renderStatus: '',
+    placedMachines: [],
+    removedMachineIds: [],
+    footprintOverrides: {},
+    layoutViewBox: null,
+    layoutViewBoxEnvelopeKey: '',
+    ...project,
+  };
+}
+
+function applyProjectState(project) {
+  const preserved = {
+    projects: appState.projects,
+    projectListLoaded: appState.projectListLoaded,
+    projectStatus: appState.projectStatus,
+  };
+  Object.assign(appState, baseProjectState(project), preserved, {
+    projectReady: Boolean(project.currentProjectId),
+    showCustomResolutionModal: false,
+    renderStatus: '',
+  });
+  if (!findLayoutMachine(appState.selectedMachineId)) {
+    appState.selectedMachineId = layoutMachines()[0]?.id ?? factoryDesign.machines[0].id;
+  }
+}
+
+function projectSavePayload() {
+  return projectTomlFromState(appState);
+}
+
+async function fetchProjectList() {
+  const response = await fetch('/api/projects');
+  if (!response.ok) throw new Error(`Project list failed: ${response.status}`);
+  return response.json();
+}
+
+async function loadProject(projectId, root = document.querySelector('#root')) {
+  if (!projectId || projectRequestInFlight) return;
+  projectRequestInFlight = true;
+  appState.projectStatus = `Loading ${projectId}.toml…`;
+  renderApp(root);
+  try {
+    const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? `Unable to load ${projectId}`);
+    const project = projectStateFromToml(result.contents, { currentProjectId: projectId });
+    applyProjectState({ ...project, currentProjectId: projectId });
+    globalThis.localStorage?.setItem(projectStorageKey, projectId);
+    appState.projectStatus = `Loaded ${appState.currentProjectName} from ${projectId}.toml.`;
+    appState.projects = await fetchProjectList();
+  } catch (error) {
+    appState.projectStatus = `Project load failed: ${error.message}`;
+  } finally {
+    projectRequestInFlight = false;
+    renderApp(root);
+  }
+}
+
+async function saveProjectNow() {
+  if (!appState.currentProjectId || !appState.projectReady) return;
+  const contents = projectSavePayload();
+  const response = await fetch(`/api/projects/${encodeURIComponent(appState.currentProjectId)}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ contents }),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? 'Autosave failed');
+  appState.projectStatus = `Autosaved ${appState.currentProjectName} at ${new Date(result.updatedAt).toLocaleTimeString()}.`;
+}
+
+function scheduleProjectAutosave() {
+  if (!appState.currentProjectId || !appState.projectReady) return;
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    saveProjectNow()
+      .then(() => renderApp())
+      .catch((error) => {
+        appState.projectStatus = `Autosave failed: ${error.message}`;
+        renderApp();
+      });
+  }, 350);
+}
+
+async function createProject(name, root = document.querySelector('#root')) {
+  const projectName = String(name || '').trim() || 'Untitled project';
+  appState.projectStatus = `Creating ${projectName}…`;
+  renderApp(root);
+  try {
+    const response = await fetch('/api/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: projectName }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? 'Project create failed');
+    applyProjectState({
+      currentProjectId: result.id,
+      currentProjectName: result.name,
+      activeTab: 'summary',
+    });
+    globalThis.localStorage?.setItem(projectStorageKey, result.id);
+    await saveProjectNow();
+    appState.projects = await fetchProjectList();
+    appState.projectStatus = `Created ${result.name}; future edits autosave to ${result.id}.toml.`;
+  } catch (error) {
+    appState.projectStatus = `Project create failed: ${error.message}`;
+  }
+  renderApp(root);
+}
+
+async function initializeProjects(root = document.querySelector('#root')) {
+  try {
+    appState.projects = await fetchProjectList();
+    appState.projectListLoaded = true;
+    const storedProjectId = globalThis.localStorage?.getItem(projectStorageKey);
+    const candidate = appState.projects.find((project) => project.id === storedProjectId) ?? appState.projects[0];
+    if (candidate) {
+      await loadProject(candidate.id, root);
+      return;
+    }
+    appState.projectStatus = 'No saved .toml projects found. Create a project to start autosaving.';
+  } catch (error) {
+    appState.projectStatus = `Project dashboard unavailable: ${error.message}`;
+  }
+  renderApp(root);
+}
 
 const selectedEnvelope = () => {
   const envelope = getEnvelope(appState.selectedEnvelopeId);
@@ -219,6 +369,38 @@ function heroMetrics() {
     </section>`;
 }
 
+
+function renderProjects() {
+  const projectCards = appState.projects.length
+    ? appState.projects.map((project) => `
+      <article class="project-card ${project.id === appState.currentProjectId ? 'selected' : ''}" data-project-id="${project.id}">
+        <div><span class="eyebrow">${project.id}.toml</span><h3>${project.name}</h3></div>
+        <p>${project.updatedAt ? `Last saved ${new Date(project.updatedAt).toLocaleString()}` : 'Ready to load from the project save directory.'}</p>
+        <button type="button" data-load-project-id="${project.id}">${project.id === appState.currentProjectId ? 'Current project' : 'Open project'}</button>
+      </article>`).join('')
+    : '<p class="empty-projects">No project .toml files exist in the save directory yet.</p>';
+
+  return `
+    <section class="workspace project-dashboard">
+      <div class="project-hero">
+        <div>
+          <span class="eyebrow">Project dashboard</span>
+          <h1>Create or continue a factory project</h1>
+          <p>Projects are saved as TOML files in the server save directory. Open an existing project or create a new one, then layout, envelope, render, and UI changes autosave as you work.</p>
+        </div>
+        <form class="project-create" data-project-create>
+          <label>New project name<input name="projectName" autocomplete="off" placeholder="Vista-style workcell concept" /></label>
+          <button type="submit">Create project</button>
+        </form>
+      </div>
+      <aside class="project-status" aria-live="polite">
+        <strong>${appState.currentProjectName || 'No project selected'}</strong>
+        <span>${appState.projectStatus}</span>
+      </aside>
+      <div class="project-grid">${projectCards}</div>
+    </section>`;
+}
+
 function renderSummary() {
   return `
     <section class="hero-panel">
@@ -352,6 +534,7 @@ function dropMachineOnLayout(root, catalogMachineId, clientX, clientY) {
 
   appState.placedMachines = [...appState.placedMachines, placedMachine];
   appState.selectedMachineId = placedMachine.id;
+  scheduleProjectAutosave();
   renderApp(root);
 }
 
@@ -456,6 +639,7 @@ function startMachineDrag(root, machineElement, event) {
     machineElement.releasePointerCapture?.(event.pointerId);
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
+    scheduleProjectAutosave();
     renderApp(root);
   };
 
@@ -464,6 +648,7 @@ function startMachineDrag(root, machineElement, event) {
 }
 function setLayoutViewBox(svg, viewBox) {
   appState.layoutViewBox = viewBox;
+  scheduleProjectAutosave();
   svg.setAttribute('viewBox', viewBoxAttribute(viewBox));
   svg.dataset.layoutViewbox = viewBoxAttribute(viewBox);
 }
@@ -583,6 +768,7 @@ function startSplitDrag(root, divider, event) {
     divider.releasePointerCapture?.(event.pointerId);
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
+    scheduleProjectAutosave();
     renderApp(root);
   };
 
@@ -895,6 +1081,7 @@ function handleExport(kind) {
 
 export function view() {
   const content = {
+    projects: renderProjects,
     summary: renderSummary,
     machines: renderMachines,
     layout: renderLayout,
@@ -906,7 +1093,7 @@ export function view() {
 
   return `
     <header class="app-header">
-      <div class="brand"><div class="brand-mark">${factoryDesign.ui.brand.mark}</div><div><strong>${factoryDesign.ui.brand.title}</strong><span>${factoryDesign.ui.brand.subtitle}</span></div></div>
+      <div class="brand"><div class="brand-mark">${factoryDesign.ui.brand.mark}</div><div><strong>${factoryDesign.ui.brand.title}</strong><span>${appState.currentProjectName ? `${appState.currentProjectName} · ${appState.projectStatus}` : factoryDesign.ui.brand.subtitle}</span></div></div>
       <nav class="tabs" aria-label="Primary views">
         ${tabs.map((tab) => `<button class="tab ${appState.activeTab === tab.id ? 'active' : ''}" data-tab-target="${tab.id}">${tab.label}</button>`).join('')}
       </nav>
@@ -936,6 +1123,10 @@ async function startRenderJob(engine, resolution) {
 
 export function bindApp(root = document.querySelector('#root')) {
   if (!root) return;
+  if (!root.dataset.projectsInitialized) {
+    root.dataset.projectsInitialized = 'true';
+    initializeProjects(root);
+  }
   root.addEventListener('click', (event) => {
     const copyTarget = event.target.closest('[data-copy-prompt]');
     if (copyTarget) {
@@ -948,10 +1139,17 @@ export function bindApp(root = document.querySelector('#root')) {
       return;
     }
 
+    const loadProjectTarget = event.target.closest('[data-load-project-id], [data-project-id]');
+    if (loadProjectTarget?.dataset.loadProjectId || loadProjectTarget?.dataset.projectId) {
+      loadProject(loadProjectTarget.dataset.loadProjectId ?? loadProjectTarget.dataset.projectId, root);
+      return;
+    }
+
     const saveResolution = event.target.closest('[data-save-custom-resolution]');
     if (saveResolution) {
       appState.selectedResolutionId = 'custom';
       appState.showCustomResolutionModal = false;
+      scheduleProjectAutosave();
       renderApp(root);
       return;
     }
@@ -993,6 +1191,7 @@ export function bindApp(root = document.querySelector('#root')) {
     const deleteMachineTarget = event.target.closest('[data-delete-machine-id]');
     if (deleteMachineTarget) {
       deleteMachineFromLayout(deleteMachineTarget.dataset.deleteMachineId);
+      scheduleProjectAutosave();
       renderApp(root);
       return;
     }
@@ -1000,6 +1199,7 @@ export function bindApp(root = document.querySelector('#root')) {
     const rotateMachineTarget = event.target.closest('[data-rotate-machine-id]');
     if (rotateMachineTarget) {
       rotateMachineFootprint(rotateMachineTarget.dataset.rotateMachineId);
+      scheduleProjectAutosave();
       renderApp(root);
       return;
     }
@@ -1025,7 +1225,17 @@ export function bindApp(root = document.querySelector('#root')) {
       appState.showCustomResolutionModal = target.dataset.renderResolutionId === 'custom';
       appState.renderStatus = '';
     }
+    scheduleProjectAutosave();
     renderApp(root);
+  });
+
+  root.addEventListener('submit', (event) => {
+    const form = event.target.closest('[data-project-create]');
+    if (!form) return;
+    event.preventDefault();
+    const data = new FormData(form);
+    createProject(data.get('projectName'), root);
+    form.reset();
   });
 
   root.addEventListener('dragstart', (event) => {
@@ -1075,6 +1285,7 @@ export function bindApp(root = document.querySelector('#root')) {
     if (deleteMachineTarget && ['Enter', ' '].includes(event.key)) {
       event.preventDefault();
       deleteMachineFromLayout(deleteMachineTarget.dataset.deleteMachineId);
+      scheduleProjectAutosave();
       renderApp(root);
       return;
     }
@@ -1083,6 +1294,7 @@ export function bindApp(root = document.querySelector('#root')) {
     if (rotateMachineTarget && ['Enter', ' '].includes(event.key)) {
       event.preventDefault();
       rotateMachineFootprint(rotateMachineTarget.dataset.rotateMachineId);
+      scheduleProjectAutosave();
       renderApp(root);
       return;
     }
@@ -1095,12 +1307,14 @@ export function bindApp(root = document.querySelector('#root')) {
     if (event.key === 'End') appState.split = 75;
     if (event.key === 'ArrowLeft') appState.split = Math.max(25, appState.split - 2);
     if (event.key === 'ArrowRight') appState.split = Math.min(75, appState.split + 2);
+    scheduleProjectAutosave();
     renderApp(root);
   });
 
   root.addEventListener('change', (event) => {
     if (event.target.id === 'flowToggle') {
       appState.showFlow = event.target.checked;
+      scheduleProjectAutosave();
       renderApp(root);
     }
   });
@@ -1108,10 +1322,12 @@ export function bindApp(root = document.querySelector('#root')) {
   root.addEventListener('input', (event) => {
     if (event.target.dataset.customDimension) {
       appState.customEnvelope[event.target.dataset.customDimension] = Number(event.target.value);
+      scheduleProjectAutosave();
       renderApp(root);
     }
     if (event.target.dataset.customRenderResolution) {
       appState.customResolution[event.target.dataset.customRenderResolution] = Number(event.target.value);
+      scheduleProjectAutosave();
     }
   });
 }
