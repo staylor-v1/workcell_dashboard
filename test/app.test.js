@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, renderBoardSvg, renderPrompt, reportPdf } from '../src/data.js';
-import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderFlow, renderLayout, tabs } from '../src/app.js';
+import { mkdtemp, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, getRenderEngine, getRenderResolution, renderBoardSvg, renderJobManifest, renderPrompt, renderViewPlan, reportPdf } from '../src/data.js';
+import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderFlow, renderLayout, renderRenders, tabs } from '../src/app.js';
 import { parseToml } from '../src/toml.js';
 
 test('factory design contains required coordinated views loaded from TOML source files', () => {
@@ -24,6 +27,10 @@ test('factory design contains required coordinated views loaded from TOML source
   assert.equal(factoryDesign.flow.length, 5);
   assert.equal(factoryDesign.machineCatalog.length, 9);
   assert.equal(factoryDesign.envelopeOptions.length, 6);
+  assert.deepEqual(factoryDesign.renderEngines.map((engine) => engine.name), ['Blender Cycles', 'LuxCoreRender', 'Mitsuba 3']);
+  assert.deepEqual(factoryDesign.renderViews.map((view) => view.id), ['top-down', 'container-door', 'orthographic']);
+  assert.deepEqual(factoryDesign.renderResolutions.map((resolution) => resolution.id), ['1k', '2k', '4k', 'custom']);
+  assert.equal(factoryDesign.machines[0].assetPath, 'assets/machines/prep.step');
 });
 
 test('design metrics identify the bottleneck from shared machine data', () => {
@@ -62,11 +69,32 @@ test('layout view exposes researched drag-and-drop industrial machine candidates
   assert.match(layoutMarkup, /draggable="true"/);
 });
 
-test('render profiles produce photorealistic prompts from the shared design', () => {
+test('render profiles and engines produce photorealistic prompts and one-click view plans', () => {
   assert.equal(factoryDesign.renderProfiles.length, 3);
+  assert.equal(factoryDesign.renderEngines.length, 3);
+  assert.equal(factoryDesign.renderViews.length, 3);
+
   const prompt = renderPrompt(factoryDesign.renderProfiles[0]);
+  const engine = getRenderEngine('mitsuba-3');
+  const resolution = getRenderResolution('4k');
+  const viewPlan = renderViewPlan(engine, factoryDesign.renderViews[0], factoryDesign, resolution);
+  const manifest = renderJobManifest(engine, factoryDesign, resolution);
+  const renderMarkup = renderRenders();
+
   assert.match(prompt, /Photorealistic industrial microfactory render/);
   assert.match(prompt, /24m x 14m scale/);
+  assert.match(viewPlan, /Mitsuba 3 Top down render/);
+  assert.match(viewPlan, /1024 samples at 3840 × 2160/);
+  assert.match(manifest, /container-door\.png/);
+  assert.match(renderMarkup, /Blender Cycles/);
+  assert.match(renderMarkup, /LuxCoreRender/);
+  assert.match(renderMarkup, /Mitsuba 3/);
+  assert.match(renderMarkup, /data-render-selected-engine="blender-cycles"/);
+  assert.match(renderMarkup, /data-render-resolution-id="1k"/);
+  assert.match(renderMarkup, /data-render-resolution-id="custom"/);
+  assert.match(renderMarkup, /top-down\.png/);
+  assert.match(renderMarkup, /container-door\.png/);
+  assert.match(renderMarkup, /factory-orthographic\.png/);
 });
 
 test('browser entrypoint loads stylesheet from HTML and keeps JavaScript browser-safe', async () => {
@@ -105,7 +133,40 @@ test('export tab generates STEP, TOML, render-board SVG, and PDF package content
   assert.match(exportMarkup, /Download \.pdf/);
   assert.match(step, /ISO-10303-21/);
   assert.match(toml, /\[envelope\]/);
+  assert.match(toml, /\[\[renderEngines\]\]/);
+  assert.match(toml, /\[\[renderViews\]\]/);
+  assert.match(toml, /\[\[renderResolutions\]\]/);
+  assert.match(toml, /assetPath = "assets\/machines\/prep.step"/);
   assert.equal(parseToml(toml).envelope.id, factoryDesign.envelopeOptions[0].id);
   assert.match(svg, /Photorealistic render board/);
   assert.match(pdf, /%PDF-1\.4/);
+});
+
+
+test('machine STEP assets exist for every layout-available machine and render script writes deterministic scenes', async () => {
+  const machines = [...factoryDesign.machines, ...factoryDesign.machineCatalog];
+  assert.equal(machines.length, 14);
+
+  for (const machine of machines) {
+    const step = await readFile(machine.assetPath, 'utf8');
+    assert.match(step, /ISO-10303-21/);
+    assert.ok(step.includes(machine.id));
+  }
+
+  const out = await mkdtemp(join(tmpdir(), 'microfactory-render-'));
+  const result = spawnSync('node', ['scripts/render-factory.mjs', '--engine', 'mitsuba-3', '--width', '1234', '--height', '777', '--out', out], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+
+  const scene = JSON.parse(await readFile(join(out, 'scene.json'), 'utf8'));
+  const manifest = await readFile(join(out, 'manifest.txt'), 'utf8');
+  const mitsubaScene = await readFile(join(out, 'top-down.xml'), 'utf8');
+  const luxMesh = await readFile(join(out, 'machine_0.ply'), 'utf8');
+
+  assert.equal(scene.resolution.width, 1234);
+  assert.equal(scene.resolution.height, 777);
+  assert.equal(scene.assets.length, machines.length);
+  assert.match(manifest, /Assets: 14 STEP files/);
+  assert.match(mitsubaScene, /<scene version="3.0.0">/);
+  assert.match(mitsubaScene, /sample_count" value="1024"/);
+  assert.match(luxMesh, /element vertex 8/);
 });
