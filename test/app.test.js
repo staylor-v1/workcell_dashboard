@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -179,11 +179,30 @@ test('render API returns JSON job metadata for every render engine', async () =>
       assert.equal(response.status, 200);
       assert.equal(result.engineId, engine.id);
       assert.equal(result.outputs.length, factoryDesign.renderViews.length);
+      assert.deepEqual(result.outputImages, []);
       assert.equal(result.executed.length, 0);
       assert.match(result.scene, /scene\.json$/);
     }
   } finally {
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('server serves completed render image artifacts with image content types', async () => {
+  const artifactPath = 'artifacts/render-jobs/test-static-output/top-down.png';
+  await mkdir('artifacts/render-jobs/test-static-output', { recursive: true });
+  await writeFile(artifactPath, 'fake png bytes');
+  const server = createMicrofactoryServer().listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  const { port } = server.address();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/${artifactPath}`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/png');
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    await rm('artifacts/render-jobs/test-static-output', { recursive: true, force: true });
   }
 });
 
@@ -321,6 +340,29 @@ test('render profiles and engines produce photorealistic prompts and one-click v
   assert.match(renderMarkup, /top-down\.png/);
   assert.match(renderMarkup, /container-door\.png/);
   assert.match(renderMarkup, /factory-orthographic\.png/);
+});
+
+test('renders tab shows completed output images with fullscreen controls', () => {
+  const previousState = {
+    renderImages: appState.renderImages,
+    fullscreenRenderImageIndex: appState.fullscreenRenderImageIndex,
+  };
+  appState.renderImages = [
+    { url: '/artifacts/render-jobs/blender-cycles-320x180/top-down.png', output: 'top-down.png' },
+    { url: '/artifacts/render-jobs/blender-cycles-320x180/container-door.png', output: 'container-door.png' },
+  ];
+  appState.fullscreenRenderImageIndex = 1;
+
+  const renderMarkup = renderRenders();
+
+  assert.match(renderMarkup, /Completed outputs/);
+  assert.match(renderMarkup, /data-render-image-index="0"/);
+  assert.match(renderMarkup, /Click any image to view it fullscreen/);
+  assert.match(renderMarkup, /render-fullscreen-modal/);
+  assert.match(renderMarkup, /data-close-render-fullscreen="true"/);
+  assert.match(renderMarkup, /container-door\.png/);
+
+  Object.assign(appState, previousState);
 });
 
 test('browser entrypoint loads stylesheet from HTML and keeps JavaScript browser-safe', async () => {

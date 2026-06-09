@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createProjectApi, readRequestJson } from './project-api.mjs';
 
@@ -14,15 +14,46 @@ const types = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.toml', 'text/plain; charset=utf-8'],
   ['.step', 'model/step'],
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.webp', 'image/webp'],
   ['.json', 'application/json; charset=utf-8'],
   ['.xml', 'application/xml; charset=utf-8'],
   ['.cfg', 'text/plain; charset=utf-8'],
   ['.scn', 'text/plain; charset=utf-8'],
 ]);
 
+
+function isInsideRoot(file) {
+  return file === root || file.startsWith(`${root}${sep}`);
+}
+
 function jsonResponse(response, status, body) {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(body));
+}
+
+
+async function existingRenderImages(resultBody) {
+  const outputs = Array.isArray(resultBody.outputs) ? resultBody.outputs : [];
+  const images = [];
+  for (const output of outputs) {
+    const outputPath = normalize(join(root, String(output)));
+    if (!isInsideRoot(outputPath)) continue;
+    try {
+      await access(outputPath);
+    } catch {
+      continue;
+    }
+    const relativePath = relative(root, outputPath).split(sep).join('/');
+    images.push({
+      path: relativePath,
+      url: `/${relativePath}`,
+      output: relativePath.split('/').at(-1),
+    });
+  }
+  return images;
 }
 
 export async function handleRenderRequest(request, response) {
@@ -57,6 +88,7 @@ export async function handleRenderRequest(request, response) {
 
     jsonResponse(response, result.status === 0 ? 200 : 202, {
       ...resultBody,
+      outputImages: await existingRenderImages(resultBody),
       stdout: result.stdout,
       stderr: result.stderr,
     });
@@ -78,7 +110,7 @@ export function createMicrofactoryServer() {
     const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
     const file = normalize(join(root, pathname));
 
-    if (!file.startsWith(root)) {
+    if (!isInsideRoot(file)) {
       response.writeHead(403);
       response.end('Forbidden');
       return;
