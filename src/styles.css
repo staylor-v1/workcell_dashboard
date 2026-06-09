@@ -112,7 +112,6 @@ dd { margin: .2rem 0 0; line-height: 1.5; }
 .layout-shell { position: relative; border-radius: 28px; overflow: hidden; background: rgba(2, 6, 23, .5); border: 1px solid var(--line); }
 .layout-canvas { display: block; width: 100%; height: min(62vh, 640px); min-height: 360px; cursor: grab; touch-action: none; }
 .layout-shell.compact .layout-canvas { height: 285px; min-height: 220px; }
-.floor-boundary { fill: rgba(15, 23, 42, .45); stroke: rgba(148, 163, 184, .26); stroke-width: .045; vector-effect: non-scaling-stroke; }
 .layout-machine { cursor: grab; touch-action: none; }
 .layout-machine:active { cursor: grabbing; }
 .layout-machine rect { fill: rgba(134, 168, 255, .18); stroke: rgba(134, 168, 255, .7); stroke-width: .045; vector-effect: non-scaling-stroke; filter: drop-shadow(0 12px 18px rgba(0,0,0,.25)); }
@@ -219,7 +218,7 @@ body.is-panning-layout .layout-canvas { cursor: grabbing; }
   .flow-graph { grid-template-columns: 1fr; }
 }
 
-.envelope-boundary { fill: rgba(62, 231, 198, .055); stroke: rgba(62, 231, 198, .85); stroke-width: .06; stroke-dasharray: .24 .16; vector-effect: non-scaling-stroke; }
+.envelope-boundary { fill: rgba(62, 231, 198, .12); stroke: rgba(62, 231, 198, .9); stroke-width: .06; stroke-dasharray: .24 .16; vector-effect: non-scaling-stroke; }
 .envelope-label { fill: var(--accent); font-size: .32px; font-weight: 900; }
 .envelope-view > p, .export-view > p { max-width: 980px; color: var(--muted); font-size: 1.02rem; }
 .envelope-grid, .export-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-top: 1.2rem; }
@@ -306,3 +305,10 @@ body.is-panning-layout .layout-canvas { cursor: grabbing; }
 @media (max-width: 920px) {
   .project-hero, .project-grid { grid-template-columns: 1fr; }
 }
+.envelope-list-panel { margin: 1.2rem 0; padding: 1rem; border: 1px solid var(--line); border-radius: 22px; background: rgba(2, 6, 23, .32); display: grid; gap: 1rem; }
+.envelope-list-panel p { margin: .35rem 0 0; color: var(--muted); }
+.layout-envelope-list { display: grid; gap: .7rem; }
+.layout-envelope-item { display: flex; justify-content: space-between; gap: 1rem; align-items: center; border: 1px solid rgba(148, 163, 184, .2); border-radius: 16px; padding: .75rem; background: rgba(15, 23, 42, .42); }
+.layout-envelope-item div { display: grid; gap: .2rem; }
+.layout-envelope-item span { color: var(--muted); font-size: .85rem; }
+.layout-envelope-item button:disabled { opacity: .45; cursor: not-allowed; }

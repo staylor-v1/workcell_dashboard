@@ -14,6 +14,7 @@ const appState = {
   showCustomResolutionModal: false,
   renderStatus: '',
   placedMachines: [],
+  layoutEnvelopes: [],
   removedMachineIds: [],
   footprintOverrides: {},
   layoutViewBox: null,
@@ -67,6 +68,7 @@ function baseProjectState(project = {}) {
     showCustomResolutionModal: false,
     renderStatus: '',
     placedMachines: [],
+    layoutEnvelopes: [],
     removedMachineIds: [],
     footprintOverrides: {},
     layoutViewBox: null,
@@ -205,6 +207,53 @@ const selectedEnvelope = () => {
   };
 };
 
+function resolveEnvelope(envelopeId, customDimensions = appState.customEnvelope) {
+  const envelope = getEnvelope(envelopeId);
+  if (envelope.id !== 'custom') return envelope;
+  const { length, width, height } = customDimensions;
+  return {
+    ...envelope,
+    dimensions: { length, width, height, unit: 'm' },
+    clearDimensions: { length: Math.max(length - 0.4, 0), width: Math.max(width - 0.4, 0), height: Math.max(height - 0.3, 0), unit: 'm' },
+  };
+}
+
+function createLayoutEnvelope(envelopeId = appState.selectedEnvelopeId) {
+  const envelope = resolveEnvelope(envelopeId);
+  return {
+    instanceId: `${envelopeId}-${Date.now().toString(36)}`,
+    envelopeId,
+    customDimensions: envelope.id === 'custom' ? { ...appState.customEnvelope } : null,
+  };
+}
+
+function layoutEnvelopeEntries() {
+  const source = appState.layoutEnvelopes?.length
+    ? appState.layoutEnvelopes
+    : [{ instanceId: 'primary-envelope', envelopeId: appState.selectedEnvelopeId, customDimensions: appState.selectedEnvelopeId === 'custom' ? appState.customEnvelope : null }];
+  let cursorX = 0;
+  return source.map((entry, index) => {
+    const envelope = resolveEnvelope(entry.envelopeId, entry.customDimensions ?? appState.customEnvelope);
+    const positioned = {
+      ...entry,
+      instanceId: entry.instanceId ?? `layout-envelope-${index + 1}`,
+      envelope,
+      x: Number(cursorX.toFixed(3)),
+      y: 0,
+    };
+    cursorX += envelope.dimensions.length + 0.4;
+    return positioned;
+  });
+}
+
+function layoutEnvelopeBounds() {
+  const entries = layoutEnvelopeEntries();
+  return entries.reduce((bounds, entry) => ({
+    width: Math.max(bounds.width, entry.x + entry.envelope.dimensions.length),
+    height: Math.max(bounds.height, entry.y + entry.envelope.dimensions.width),
+  }), { width: 0.1, height: 0.1 });
+}
+
 function machineCard(machine, compact = false) {
   const params = machine.parameters
     .map(([label, value]) => `<li><span>${label}</span><strong>${value}</strong></li>`)
@@ -227,19 +276,22 @@ function machineCard(machine, compact = false) {
 }
 
 function layoutEnvelopeKey() {
-  const envelope = selectedEnvelope();
-  const { length, width } = envelope.dimensions;
-  return `${envelope.id}:${length}:${width}`;
+  return layoutEnvelopeEntries()
+    .map((entry) => {
+      const { length, width } = entry.envelope.dimensions;
+      return `${entry.envelopeId}:${length}:${width}`;
+    })
+    .join('|');
 }
 
 function defaultLayoutViewBox() {
-  const envelope = selectedEnvelope();
-  const padding = Math.max(Math.min(envelope.dimensions.length, envelope.dimensions.width) * 0.035, 0.12);
+  const bounds = layoutEnvelopeBounds();
+  const padding = Math.max(Math.min(bounds.width, bounds.height) * 0.035, 0.12);
   return {
     x: -padding,
     y: -padding,
-    width: envelope.dimensions.length + padding * 2,
-    height: envelope.dimensions.width + padding * 2,
+    width: bounds.width + padding * 2,
+    height: bounds.height + padding * 2,
   };
 }
 
@@ -261,9 +313,10 @@ function machineModelNumber(machine) {
 }
 
 function layoutSvg({ compact = false } = {}) {
-  const envelope = selectedEnvelope();
+  const envelopeEntries = layoutEnvelopeEntries();
+  const bounds = layoutEnvelopeBounds();
   const viewBox = compact
-    ? { x: -0.5, y: -0.5, width: Math.max(factoryDesign.floorSize.width, envelope.dimensions.length) + 1, height: Math.max(factoryDesign.floorSize.height, envelope.dimensions.width) + 1 }
+    ? { x: -0.5, y: -0.5, width: bounds.width + 1, height: bounds.height + 1 }
     : currentLayoutViewBox();
   const machines = layoutMachines()
     .map((machine) => {
@@ -292,7 +345,7 @@ function layoutSvg({ compact = false } = {}) {
         : '';
       return `
         <g class="layout-machine${selectedClass}" data-machine-id="${machine.id}" data-layout-draggable="true" tabindex="0" role="button" aria-label="Select and drag ${machine.name}">
-          <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="0.18" />
+          <rect x="${x}" y="${y}" width="${w}" height="${h}" />
           <text x="${x + w / 2}" y="${y + h / 2 - 0.12}" text-anchor="middle">${machine.name.split(' ')[0]}</text>
           <text class="layout-machine__sub" x="${x + w / 2}" y="${y + h / 2 + 0.22}" text-anchor="middle">${machineModelNumber(machine)}</text>
         </g>
@@ -314,21 +367,21 @@ function layoutSvg({ compact = false } = {}) {
         .join('')
     : '';
 
+  const envelopes = envelopeEntries
+    .map((entry) => `
+        <rect x="${entry.x}" y="${entry.y}" width="${entry.envelope.dimensions.length}" height="${entry.envelope.dimensions.width}" class="envelope-boundary" />
+        <text x="${entry.x + 0.24}" y="${entry.y + 0.38}" class="envelope-label">${entry.envelope.name}</text>`)
+    .join('');
+
   return `
     <div class="layout-shell ${compact ? 'compact' : ''}" data-layout-pan-zoom="${compact ? 'false' : 'true'}">
       <svg class="layout-canvas" viewBox="${viewBoxAttribute(viewBox)}" data-layout-viewbox="${viewBoxAttribute(viewBox)}" role="img" aria-label="Top down microfactory layout">
         <defs>
-          <pattern id="floor-grid" width="1" height="1" patternUnits="userSpaceOnUse">
-            <path d="M 1 0 L 0 0 0 1" fill="none" stroke="rgba(148, 163, 184, .18)" stroke-width="0.025" />
-          </pattern>
           <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
             <path d="M0,0 L0,6 L8,3 z" fill="#3ee7c6" />
           </marker>
         </defs>
-        <rect x="${viewBox.x}" y="${viewBox.y}" width="${viewBox.width}" height="${viewBox.height}" rx="0.24" fill="url(#floor-grid)" />
-        <rect x="0" y="0" width="${factoryDesign.floorSize.width}" height="${factoryDesign.floorSize.height}" rx="0.2" class="floor-boundary" />
-        <rect x="0" y="0" width="${envelope.dimensions.length}" height="${envelope.dimensions.width}" rx="0.16" class="envelope-boundary" />
-        <text x="0.24" y="0.38" class="envelope-label">${envelope.name}</text>
+        ${envelopes}
         ${flows}
         ${machines}
       </svg>
@@ -568,10 +621,10 @@ function pointerToLayout(svg, clientX, clientY) {
 }
 
 function layoutPlacementBounds(footprint = { w: 0, h: 0 }) {
-  const envelope = selectedEnvelope();
+  const bounds = layoutEnvelopeBounds();
   return {
-    width: Math.max(envelope.dimensions.length, footprint.w, 0.1),
-    height: Math.max(envelope.dimensions.width, footprint.h, 0.1),
+    width: Math.max(bounds.width, footprint.w, 0.1),
+    height: Math.max(bounds.height, footprint.h, 0.1),
   };
 }
 
@@ -671,9 +724,9 @@ function zoomLayoutAtPointer(svg, event) {
   const current = svgViewBox(svg);
   const pointer = pointerToLayout(svg, event.clientX, event.clientY);
   const zoomFactor = event.deltaY < 0 ? 0.88 : 1.14;
-  const envelope = selectedEnvelope();
-  const minWidth = Math.max(envelope.dimensions.length * 0.16, 1.2);
-  const maxWidth = Math.max(factoryDesign.floorSize.width, envelope.dimensions.length) * 1.8;
+  const bounds = layoutEnvelopeBounds();
+  const minWidth = Math.max(bounds.width * 0.16, 1.2);
+  const maxWidth = bounds.width * 1.8;
   const nextWidth = Math.min(Math.max(current.width * zoomFactor, minWidth), maxWidth);
   const nextHeight = nextWidth * (current.height / current.width);
   const ratioX = (pointer.x - current.x) / current.width;
@@ -935,6 +988,21 @@ function renderEnvelope() {
             <small>CAD: ${option.cadModel.status}</small>
           </article>`).join('')}
       </div>
+      <section class="envelope-list-panel">
+        <div>
+          <span class="eyebrow">Layout envelope list</span>
+          <h2>Containers and structures in this layout</h2>
+          <p>Add more than one container or structure when the workcell spans multiple connected envelopes. The top-down working area is drawn from this list.</p>
+        </div>
+        <button type="button" data-add-layout-envelope="${appState.selectedEnvelopeId}">Add selected envelope</button>
+        <div class="layout-envelope-list">
+          ${layoutEnvelopeEntries().map((entry, index) => `
+            <article class="layout-envelope-item" data-layout-envelope-instance="${entry.instanceId}">
+              <div><strong>${index + 1}. ${entry.envelope.name}</strong><span>${entry.envelope.dimensions.length}m × ${entry.envelope.dimensions.width}m × ${entry.envelope.dimensions.height}m</span></div>
+              <button type="button" data-remove-layout-envelope="${entry.instanceId}" ${!appState.layoutEnvelopes?.length ? 'disabled' : ''}>Remove</button>
+            </article>`).join('')}
+        </div>
+      </section>
       <section class="envelope-detail">
         <div>
           <span class="eyebrow">Selected CAD envelope</span>
@@ -1201,6 +1269,24 @@ export function bindApp(root = document.querySelector('#root')) {
       return;
     }
 
+    const addLayoutEnvelope = event.target.closest('[data-add-layout-envelope]');
+    if (addLayoutEnvelope) {
+      appState.layoutEnvelopes = [...(appState.layoutEnvelopes ?? []), createLayoutEnvelope(addLayoutEnvelope.dataset.addLayoutEnvelope)];
+      appState.layoutViewBox = null;
+      scheduleProjectAutosave();
+      renderApp(root);
+      return;
+    }
+
+    const removeLayoutEnvelope = event.target.closest('[data-remove-layout-envelope]');
+    if (removeLayoutEnvelope && !removeLayoutEnvelope.disabled) {
+      appState.layoutEnvelopes = (appState.layoutEnvelopes ?? []).filter((entry) => entry.instanceId !== removeLayoutEnvelope.dataset.removeLayoutEnvelope);
+      appState.layoutViewBox = null;
+      scheduleProjectAutosave();
+      renderApp(root);
+      return;
+    }
+
     const deleteMachineTarget = event.target.closest('[data-delete-machine-id]');
     if (deleteMachineTarget) {
       deleteMachineFromLayout(deleteMachineTarget.dataset.deleteMachineId);
@@ -1335,6 +1421,7 @@ export function bindApp(root = document.querySelector('#root')) {
   root.addEventListener('input', (event) => {
     if (event.target.dataset.customDimension) {
       appState.customEnvelope[event.target.dataset.customDimension] = Number(event.target.value);
+      appState.layoutViewBox = null;
       scheduleProjectAutosave();
       renderApp(root);
     }

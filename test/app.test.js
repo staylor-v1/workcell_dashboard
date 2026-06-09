@@ -48,6 +48,7 @@ test('project dashboard lists TOML-backed projects and serializes autosave state
     activeTab: 'projects',
     selectedEnvelopeId: 'custom',
     customEnvelope: { length: 9.5, width: 3.2, height: 2.8 },
+    layoutEnvelopes: [{ instanceId: 'custom-pod-1', envelopeId: 'custom', customDimensions: { length: 9.5, width: 3.2, height: 2.8 } }],
     placedMachines: [{
       ...factoryDesign.machineCatalog[0],
       id: 'eos-m290-instance',
@@ -68,11 +69,13 @@ test('project dashboard lists TOML-backed projects and serializes autosave state
   assert.match(markup, /data-project-create/);
   assert.match(markup, /data-load-project-id="demo-workcell"/);
   assert.match(toml, /\[project\]/);
+  assert.match(toml, /\[\[layoutEnvelopes\]\]/);
   assert.match(toml, /\[\[placedMachines\]\]/);
   assert.match(toml, /\[\[footprintOverrides\]\]/);
   assert.equal(restored.currentProjectId, 'demo-workcell');
   assert.equal(restored.currentProjectName, 'Demo Workcell');
   assert.equal(restored.customEnvelope.length, 9.5);
+  assert.equal(restored.layoutEnvelopes[0].customDimensions.length, 9.5);
   assert.equal(restored.placedMachines[0].catalogId, factoryDesign.machineCatalog[0].id);
   assert.equal(restored.footprintOverrides.prep.x, 0.5);
   assert.equal(slugifyProjectName('Factory Project!'), 'factory-project');
@@ -135,6 +138,10 @@ test('layout and flow render from the same machine and flow model', () => {
   assert.match(layoutMarkup, /Top down microfactory layout/);
   assert.match(layoutMarkup, /data-layout-pan-zoom="true"/);
   assert.match(layoutMarkup, /viewBox="-0\.12 -0\.12 12\.432 2\.678/);
+  assert.doesNotMatch(layoutMarkup, /floor-grid/);
+  assert.doesNotMatch(layoutMarkup, /floor-boundary/);
+  assert.doesNotMatch(layoutMarkup, /class="layout-machine[^>]*>\s*<rect[^>]*rx=/);
+  assert.doesNotMatch(layoutMarkup, /class="envelope-boundary"[^>]*rx=/);
   assert.match(layoutMarkup, /Precision Molding Island|Precision/);
   assert.match(layoutMarkup, /PMI-58/);
   assert.doesNotMatch(layoutMarkup, /58s takt/);
@@ -239,6 +246,9 @@ test('envelope tab provides researched defaults, custom dimensions, and CAD prev
   assert.match(envelopeMarkup, /20ft Conex \/ ISO dry container/);
   assert.match(envelopeMarkup, /Custom envelope/);
   assert.match(envelopeMarkup, /data-custom-dimension="length"/);
+  assert.match(envelopeMarkup, /Layout envelope list/);
+  assert.match(envelopeMarkup, /data-add-layout-envelope="conex-40"/);
+  assert.match(envelopeMarkup, /data-remove-layout-envelope="primary-envelope"/);
   assert.match(cadMarkup, /CAD preview for 40ft Conex/);
   assert.equal(factoryDesign.envelopeOptions[0].cadModel.assetPath, 'assets/envelopes/conex-40.step');
 });
