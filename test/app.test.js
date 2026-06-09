@@ -91,8 +91,13 @@ test('selected layout machines expose footprint delete and reposition controls',
   assert.match(layoutMarkup, /data-layout-draggable="true"/);
   assert.match(layoutMarkup, /aria-label="Select and drag Feedstock Prep Cell"/);
   assert.match(layoutMarkup, /class="layout-machine__delete"/);
+  assert.match(layoutMarkup, /class="layout-machine__delete-hitbox"/);
   assert.match(layoutMarkup, /data-delete-machine-id="prep"/);
   assert.match(layoutMarkup, /aria-label="Delete Feedstock Prep Cell from layout"/);
+  assert.match(layoutMarkup, /class="layout-machine__rotate"/);
+  assert.match(layoutMarkup, /class="layout-machine__rotate-hitbox"/);
+  assert.match(layoutMarkup, /data-rotate-machine-id="prep"/);
+  assert.match(layoutMarkup, /aria-label="Rotate Feedstock Prep Cell footprint 90 degrees"/);
 });
 
 test('render profiles and engines produce photorealistic prompts and one-click view plans', () => {
