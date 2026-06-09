@@ -72,6 +72,18 @@ export function projectTomlFromState(state) {
     lines.push('[layoutViewBox]', ...footprintFields(state.layoutViewBox).map((line) => line.replace(/^w = /, 'width = ').replace(/^h = /, 'height = ')), '');
   }
 
+  for (const envelope of state.layoutEnvelopes ?? []) {
+    lines.push(
+      '[[layoutEnvelopes]]',
+      field('instanceId', envelope.instanceId),
+      field('envelopeId', envelope.envelopeId),
+      field('customLength', Number(envelope.customDimensions?.length ?? 0)),
+      field('customWidth', Number(envelope.customDimensions?.width ?? 0)),
+      field('customHeight', Number(envelope.customDimensions?.height ?? 0)),
+      '',
+    );
+  }
+
   for (const machine of state.placedMachines ?? []) {
     lines.push(
       '[[placedMachines]]',
@@ -111,6 +123,21 @@ export function projectStateFromToml(source, defaults = {}) {
   const customEnvelope = parsed.customEnvelope ?? {};
   const customResolution = parsed.customResolution ?? {};
   const layoutViewBox = parsed.layoutViewBox;
+
+  const layoutEnvelopes = (parsed.layoutEnvelopes ?? [])
+    .map((envelope) => {
+      if (!factoryDesign.envelopeOptions.some((option) => option.id === envelope.envelopeId)) return null;
+      return {
+        instanceId: envelope.instanceId || `${envelope.envelopeId}-saved`,
+        envelopeId: envelope.envelopeId,
+        customDimensions: envelope.envelopeId === 'custom' ? {
+          length: numberOrFallback(envelope.customLength, factoryDesign.ui.defaults.customEnvelope.length),
+          width: numberOrFallback(envelope.customWidth, factoryDesign.ui.defaults.customEnvelope.width),
+          height: numberOrFallback(envelope.customHeight, factoryDesign.ui.defaults.customEnvelope.height),
+        } : null,
+      };
+    })
+    .filter(Boolean);
 
   const placedMachines = (parsed.placedMachines ?? [])
     .map((machine) => {
@@ -168,6 +195,7 @@ export function projectStateFromToml(source, defaults = {}) {
       width: numberOrFallback(layoutViewBox.width, 1),
       height: numberOrFallback(layoutViewBox.height, 1),
     } : null,
+    layoutEnvelopes,
     placedMachines,
     footprintOverrides,
   };
