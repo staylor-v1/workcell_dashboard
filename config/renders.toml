@@ -21,3 +21,97 @@ camera = "orthographic exploded product-state composition"
 lighting = "studio gradient with crisp contact shadows"
 materials = "raw resin, stamped copper, populated PCB, gasket adhesive, serialized carton"
 subject = "feedstock through validated packaged product in five states"
+
+[[render_engines]]
+id = "blender-cycles"
+name = "Blender Cycles"
+engine = "CYCLES"
+render_button = "Render 3 Cycles views"
+quality = "Production photoreal"
+integrator = "Path tracing with adaptive sampling, light tree, path guiding, and OpenImageDenoise"
+samples = 1024
+resolution = "3840 × 2160"
+color = "Filmic view transform, medium-high contrast, transparent-film off, 32-bit EXR masters plus PNG review copies"
+settings = ["Adaptive sampling noise threshold 0.01", "Min samples 64", "Max bounces 12", "Diffuse/glossy/transmission bounces 6", "Transparent bounces 8", "Indirect clamp 10 to tame fireflies", "Denoising data passes with albedo and normal", "Ambient occlusion/contact shadows for viewport previews only"]
+command = "blender --background microfactory.blend --python scripts/render_factory_views.py -- --engine cycles --views top-down,container-door,orthographic"
+source_label = "Blender Manual: Cycles sampling, denoising, light paths"
+source_url = "https://docs.blender.org/manual/en/5.0/render/cycles/render_settings/sampling.html"
+
+[[render_engines]]
+id = "luxcore"
+name = "LuxCoreRender"
+engine = "PATHCPU"
+render_button = "Render 3 LuxCore views"
+quality = "Production unbiased"
+integrator = "Path CPU/OpenCL progressive tracing with Sobol sampling and OIDN denoise AOVs"
+samples = 1200
+resolution = "3840 × 2160"
+color = "Linear OpenEXR output, Reinhard/NOP tone map handoff, PNG review copies"
+settings = ["PATHCPU/PATHOCL integrator for full AOV support", "Sobol sampler for progressive stills", "Max path depth 12", "Russian roulette after depth 5", "Halt samples 1200 and halt noise 0.01", "OpenCL enabled when available", "OIDN denoiser with albedo and average-shading-normal AOVs", "Clamp bright indirect contributions conservatively"]
+command = "luxcoreconsole -D renderengine.type PATHCPU -D sampler.type SOBOL -D batch.haltspp 1200 -o renders/luxcore microfactory_luxcore.cfg"
+source_label = "LuxCoreRender Wiki: engines and render settings"
+source_url = "https://wiki.luxcorerender.org/Render_Configuration"
+
+[[render_engines]]
+id = "mitsuba-3"
+name = "Mitsuba 3"
+engine = "path"
+render_button = "Render 3 Mitsuba views"
+quality = "Spectral reference"
+integrator = "Path tracer with MIS, low-discrepancy sampler, HDR film, and explicit orthographic sensors"
+samples = 1024
+resolution = "3840 × 2160"
+color = "HDR EXR film in RGB variant with ACES/Filmic preview LUT in review export"
+settings = ["Integrator type path", "max_depth 12", "rr_depth 5", "Low-discrepancy sampler sample_count 1024", "HDR film with Gaussian reconstruction filter", "One named sensor per required view", "Orthographic sensors for layout views", "Area emitters sized to overhead factory bays"]
+command = "mitsuba render -m scalar_rgb -D spp=1024 -D integrator=path -o renders/mitsuba microfactory_mitsuba.xml"
+source_label = "Mitsuba 3 Docs: path integrator, sensors, samplers"
+source_url = "https://mitsuba.readthedocs.io/en/latest/src/generated/plugins_integrators.html"
+
+[[render_views]]
+id = "top-down"
+title = "Top down"
+camera = "Orthographic plan camera centered above the factory, looking straight down with north-up layout alignment"
+shot = "full production floor, all workcells, aisles, flow arrows, envelope outline, safety markings"
+output = "top-down.png"
+
+[[render_views]]
+id = "container-door"
+title = "Container door"
+camera = "Orthographic-to-mild-telephoto camera outside the open container doors at dock height"
+shot = "door frame, threshold, first two workcells, cable trays, operator-safe access path, believable container scale"
+output = "container-door.png"
+
+[[render_views]]
+id = "orthographic"
+title = "Factory orthographic"
+camera = "Three-quarter orthographic camera high over the front corner with parallel verticals"
+shot = "complete factory as a clean architectural/product visualization with roof removed and machines readable"
+output = "factory-orthographic.png"
+
+[[render_resolutions]]
+id = "1k"
+label = "1K"
+width = 1024
+height = 576
+preset = true
+
+[[render_resolutions]]
+id = "2k"
+label = "2K"
+width = 2048
+height = 1152
+preset = true
+
+[[render_resolutions]]
+id = "4k"
+label = "4K"
+width = 3840
+height = 2160
+preset = true
+
+[[render_resolutions]]
+id = "custom"
+label = "Custom"
+width = 1920
+height = 1080
+preset = false

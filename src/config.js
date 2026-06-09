@@ -32,9 +32,14 @@ function normalizeParameters(parameters = []) {
   return parameters.map((parameter) => [parameter.label, parameter.value]);
 }
 
+function machineAssetPath(machine) {
+  return `assets/machines/${machine.id}.step`;
+}
+
 function normalizeMachines(machines = []) {
   return machines.map((machine) => ({
     ...machine,
+    assetPath: machineAssetPath(machine),
     parameters: normalizeParameters(machine.parameters),
   }));
 }
@@ -42,6 +47,7 @@ function normalizeMachines(machines = []) {
 function normalizeMachineCatalog(machineCatalog = []) {
   return machineCatalog.map((machine) => ({
     ...machine,
+    assetPath: machineAssetPath(machine),
     parameters: normalizeParameters(machine.parameters),
   }));
 }
@@ -74,6 +80,9 @@ export function buildFactoryDesign(config) {
     exportPackages: exports.export_packages,
     exportMetadata: exports.metadata,
     renderProfiles: renders.render_profiles,
+    renderEngines: renders.render_engines,
+    renderViews: renders.render_views,
+    renderResolutions: renders.render_resolutions,
     ui: {
       tabs: ui.tabs,
       brand: ui.brand,

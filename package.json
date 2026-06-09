@@ -3,7 +3,10 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "test": "node --test",
-    "snapshot": "node scripts/snapshot.mjs"
+    "snapshot": "node scripts/snapshot.mjs",
+    "server": "node server.mjs",
+    "assets": "node scripts/generate-machine-assets.mjs",
+    "render": "node scripts/render-factory.mjs"
   },
   "type": "module",
   "devDependencies": {
