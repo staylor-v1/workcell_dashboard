@@ -1,12 +1,12 @@
 # Microfactory Layout Studio
 
-A zero-dependency web application for designing and reasoning about a compact microfactory. The studio provides coordinated tabs over a shared factory model:
+A React/Vite web application for designing and reasoning about a compact microfactory. The studio provides coordinated tabs over a shared factory model:
 
 - **Summary** — dashboard cards with miniature layout, machine, flow, and render-planning previews.
 - **Machines** — machine list with cycle time, uptime, energy draw, operating status, and process parameters.
 - **Layout** — top-down factory placement diagram with selectable machines, a researched drag-and-drop machine candidate palette, selected envelope boundary, and toggleable product-flow visualization.
 - **Envelope** — container and building-envelope selector with Conex defaults, custom dimensions, generated CAD previews, and CAD model metadata.
-- **Flow** — text and visual graph representations of feedstock-to-finished-product transformations with an adjustable split bar.
+- **Flow** — text and visual graph representations of feedstock-to-finished-product transformations with a drag-to-resize divider between the text and visual panels.
 - **Renders** — photorealistic render-brief cards for turning the design into visual direction.
 - **Export** — client-side export actions for a whole-factory `.step`, design `.toml`, render-board `.svg`, and `.pdf` report package.
 

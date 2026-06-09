@@ -18,7 +18,8 @@ async function readConfigFile(path) {
     return response.text();
   }
 
-  const { readFile } = await import('node:fs/promises');
+  const nodeFsPromises = 'node:fs/promises';
+  const { readFile } = await import(/* @vite-ignore */ nodeFsPromises);
   return readFile(path, 'utf8');
 }
 
