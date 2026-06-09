@@ -103,12 +103,24 @@ function layoutSvg({ compact = false } = {}) {
       const { x, y, w, h } = machine.footprint;
       const selected = machine.id === appState.selectedMachineId;
       const selectedClass = selected ? ' selected' : '';
-      const deleteX = x + w - 0.18;
-      const deleteY = y + 0.18;
+      const deleteX = x + w - 0.16;
+      const deleteY = y + 0.16;
+      const deleteSize = 0.08;
+      const rotateX = x + 0.2;
+      const rotateY = y + h - 0.2;
+      const rotateControl = selected && !compact
+        ? `<g class="layout-machine__rotate" data-rotate-machine-id="${machine.id}" tabindex="0" role="button" aria-label="Rotate ${machine.name} footprint 90 degrees">
+            <circle class="layout-machine__rotate-hitbox" cx="${rotateX}" cy="${rotateY}" r="0.22" />
+            <path d="M ${rotateX - 0.08} ${rotateY - 0.1} A 0.16 0.16 0 0 1 ${rotateX + 0.1} ${rotateY - 0.08}" />
+            <path class="layout-machine__rotate-arrow" d="M ${rotateX + 0.1} ${rotateY - 0.08} L ${rotateX + 0.055} ${rotateY - 0.12} M ${rotateX + 0.1} ${rotateY - 0.08} L ${rotateX + 0.095} ${rotateY - 0.14}" />
+            <path d="M ${rotateX + 0.08} ${rotateY + 0.1} A 0.16 0.16 0 0 1 ${rotateX - 0.1} ${rotateY + 0.08}" />
+            <path class="layout-machine__rotate-arrow" d="M ${rotateX - 0.1} ${rotateY + 0.08} L ${rotateX - 0.055} ${rotateY + 0.12} M ${rotateX - 0.1} ${rotateY + 0.08} L ${rotateX - 0.095} ${rotateY + 0.14}" />
+          </g>`
+        : '';
       const deleteControl = selected && !compact
         ? `<g class="layout-machine__delete" data-delete-machine-id="${machine.id}" tabindex="0" role="button" aria-label="Delete ${machine.name} from layout">
-            <circle cx="${deleteX}" cy="${deleteY}" r="0.18" />
-            <path d="M ${deleteX - 0.06} ${deleteY - 0.06} L ${deleteX + 0.06} ${deleteY + 0.06} M ${deleteX + 0.06} ${deleteY - 0.06} L ${deleteX - 0.06} ${deleteY + 0.06}" />
+            <circle class="layout-machine__delete-hitbox" cx="${deleteX}" cy="${deleteY}" r="0.18" />
+            <path d="M ${deleteX - deleteSize} ${deleteY - deleteSize} L ${deleteX + deleteSize} ${deleteY + deleteSize} M ${deleteX + deleteSize} ${deleteY - deleteSize} L ${deleteX - deleteSize} ${deleteY + deleteSize}" />
           </g>`
         : '';
       return `
@@ -117,6 +129,7 @@ function layoutSvg({ compact = false } = {}) {
           <text x="${x + w / 2}" y="${y + h / 2 - 0.12}" text-anchor="middle">${machine.name.split(' ')[0]}</text>
           <text class="layout-machine__sub" x="${x + w / 2}" y="${y + h / 2 + 0.22}" text-anchor="middle">${machine.cycleTime}s takt</text>
         </g>
+        ${rotateControl}
         ${deleteControl}`;
     })
     .join('');
@@ -380,6 +393,25 @@ function updateMachineFootprint(machineId, x, y) {
   };
 }
 
+function rotateMachineFootprint(machineId) {
+  const machine = findLayoutMachine(machineId);
+  if (!machine) return;
+  const rotatedFootprint = {
+    ...machine.footprint,
+    w: machine.footprint.h,
+    h: machine.footprint.w,
+  };
+  const bounds = layoutPlacementBounds(rotatedFootprint);
+  const position = {
+    x: Number(Math.min(machine.footprint.x, bounds.width - rotatedFootprint.w).toFixed(2)),
+    y: Number(Math.min(machine.footprint.y, bounds.height - rotatedFootprint.h).toFixed(2)),
+  };
+  appState.footprintOverrides = {
+    ...appState.footprintOverrides,
+    [machineId]: { ...rotatedFootprint, ...position },
+  };
+}
+
 function deleteMachineFromLayout(machineId) {
   const remainingPlacedMachines = appState.placedMachines.filter((machine) => machine.id !== machineId);
   const removedPlacedMachine = remainingPlacedMachines.length !== appState.placedMachines.length;
@@ -399,7 +431,7 @@ function startMachineDrag(root, machineElement, event) {
   const svg = machineElement.closest('.layout-canvas');
   const machineId = machineElement.dataset.machineId;
   const machine = findLayoutMachine(machineId);
-  if (!svg || !machine || event.target.closest('[data-delete-machine-id]')) return;
+  if (!svg || !machine || event.target.closest('[data-delete-machine-id], [data-rotate-machine-id]')) return;
 
   event.preventDefault();
   machineElement.setPointerCapture?.(event.pointerId);
@@ -453,7 +485,7 @@ function zoomLayoutAtPointer(svg, event) {
 }
 
 function startLayoutPan(root, svg, event) {
-  if (event.target.closest('[data-layout-draggable], [data-delete-machine-id]')) return;
+  if (event.target.closest('[data-layout-draggable], [data-delete-machine-id], [data-rotate-machine-id]')) return;
   event.preventDefault();
   svg.setPointerCapture?.(event.pointerId);
   const start = { x: event.clientX, y: event.clientY, viewBox: svgViewBox(svg) };
@@ -961,6 +993,13 @@ export function bindApp(root = document.querySelector('#root')) {
       return;
     }
 
+    const rotateMachineTarget = event.target.closest('[data-rotate-machine-id]');
+    if (rotateMachineTarget) {
+      rotateMachineFootprint(rotateMachineTarget.dataset.rotateMachineId);
+      renderApp(root);
+      return;
+    }
+
     const target = event.target.closest('[data-tab-target], [data-machine-id], [data-envelope-id], [data-render-engine-id], [data-render-resolution-id]');
 
     if (!target) return;
@@ -1032,6 +1071,14 @@ export function bindApp(root = document.querySelector('#root')) {
     if (deleteMachineTarget && ['Enter', ' '].includes(event.key)) {
       event.preventDefault();
       deleteMachineFromLayout(deleteMachineTarget.dataset.deleteMachineId);
+      renderApp(root);
+      return;
+    }
+
+    const rotateMachineTarget = event.target.closest('[data-rotate-machine-id]');
+    if (rotateMachineTarget && ['Enter', ' '].includes(event.key)) {
+      event.preventDefault();
+      rotateMachineFootprint(rotateMachineTarget.dataset.rotateMachineId);
       renderApp(root);
       return;
     }
