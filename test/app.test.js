@@ -59,6 +59,7 @@ test('project dashboard lists TOML-backed projects and serializes autosave state
       footprint: { x: 1.1, y: 0.8, w: 2.5, h: 1.3 },
     }],
     footprintOverrides: { prep: { x: 0.5, y: 0.25, w: 1.4, h: 0.9 } },
+    collapsedMachineCategories: ['Metal additive'],
   });
 
   const markup = view();
@@ -73,12 +74,14 @@ test('project dashboard lists TOML-backed projects and serializes autosave state
   assert.match(toml, /\[\[layoutEnvelopes\]\]/);
   assert.match(toml, /\[\[placedMachines\]\]/);
   assert.match(toml, /\[\[footprintOverrides\]\]/);
+  assert.match(toml, /collapsedMachineCategories = \["Metal additive"\]/);
   assert.equal(restored.currentProjectId, 'demo-workcell');
   assert.equal(restored.currentProjectName, 'Demo Workcell');
   assert.equal(restored.customEnvelope.length, 9.5);
   assert.equal(restored.layoutEnvelopes[0].customDimensions.length, 9.5);
   assert.equal(restored.placedMachines[0].catalogId, factoryDesign.machineCatalog[0].id);
   assert.equal(restored.footprintOverrides.prep.x, 0.5);
+  assert.deepEqual(restored.collapsedMachineCategories, ['Metal additive']);
   assert.equal(slugifyProjectName('Factory Project!'), 'factory-project');
 
   Object.assign(appState, previousState);
@@ -121,7 +124,7 @@ test('layout view recovers when zoom or pan leaves an invalid viewBox after clic
 
   const layoutMarkup = layoutSvg();
 
-  assert.match(layoutMarkup, /viewBox="-0\.12 -0\.12 12\.432 2\.678/);
+  assert.match(layoutMarkup, /viewBox="-0\.45 -0\.45 13\.092 3\.338/);
   assert.doesNotMatch(layoutMarkup, /NaN|Infinity/);
   assert.match(layoutMarkup, /40ft Conex \/ ISO dry container/);
 
@@ -209,7 +212,7 @@ test('layout and flow render from the same machine and flow model', () => {
   const graphMarkup = flowGraph();
   assert.match(layoutMarkup, /Top down microfactory layout/);
   assert.match(layoutMarkup, /data-layout-pan-zoom="true"/);
-  assert.match(layoutMarkup, /viewBox="-0\.12 -0\.12 12\.432 2\.678/);
+  assert.match(layoutMarkup, /viewBox="-0\.45 -0\.45 13\.092 3\.338/);
   assert.doesNotMatch(layoutMarkup, /floor-grid/);
   assert.doesNotMatch(layoutMarkup, /floor-boundary/);
   assert.doesNotMatch(layoutMarkup, /class="layout-machine[^>]*>\s*<rect[^>]*rx=/);
@@ -255,6 +258,21 @@ test('layout view exposes researched drag-and-drop industrial machine candidates
   assert.equal(nikon.footprint.w, 3.15);
   assert.equal(nikon.footprint.h, 1.28);
   assert.match(nikon.sourceUrl, /System-Nikon-SLM280-2-02024\.pdf/);
+});
+
+
+test('machine palette categories can be collapsed and hidden from the drag catalog', () => {
+  const previousState = { ...appState, collapsedMachineCategories: [...(appState.collapsedMachineCategories ?? [])] };
+  Object.assign(appState, { collapsedMachineCategories: ['Metal additive'] });
+
+  const layoutMarkup = renderLayout();
+
+  assert.match(layoutMarkup, /data-toggle-machine-category="Metal additive"/);
+  assert.match(layoutMarkup, /aria-expanded="false"/);
+  assert.match(layoutMarkup, /<div class="machine-palette__items" id="machine-category-1" hidden>/);
+  assert.match(layoutMarkup, /data-toggle-machine-category="Wire EDM"[^]*aria-expanded="true"/);
+
+  Object.assign(appState, previousState);
 });
 
 test('selected layout machines expose footprint delete and reposition controls', () => {
