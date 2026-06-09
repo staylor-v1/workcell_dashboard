@@ -8,7 +8,7 @@ A React/Vite web application for designing and reasoning about a compact microfa
 - **Envelope** — container and building-envelope selector with Conex defaults, custom dimensions, generated CAD previews, and CAD model metadata.
 - **Flow** — text and visual graph representations of feedstock-to-finished-product transformations with a drag-to-resize divider between the text and visual panels.
 - **Renders** — photorealistic render-brief cards for turning the design into visual direction.
-- **Export** — client-side export actions for a whole-factory `.step`, design `.toml`, render-board `.svg`, and `.pdf` report package.
+- **Export** — client-side export actions for an NVIDIA Omniverse USD file set, a professional-CAD `.step` full assembly, design `.toml`, render-board `.svg`, and `.pdf` report package.
 
 
 ## Editable TOML configuration
@@ -50,4 +50,4 @@ The Renders tab generates copy-ready photorealistic render prompts from the shar
 
 ## Envelope and export data
 
-The Envelope tab includes standard 20ft and 40ft Conex/ISO dry-container options, a 40ft high-cube option, modular cleanroom and deployable shelter structures, and a Custom option for user-defined dimensions. CAD previews and export files are generated parametrically from the shared design model.
+The Envelope tab includes standard 20ft and 40ft Conex/ISO dry-container options, a 40ft high-cube option, modular cleanroom and deployable shelter structures, and a Custom option for user-defined dimensions. CAD previews and export files are generated parametrically from the shared design model. The Export tab includes a professional-CAD STEP assembly of the full design plus an NVIDIA Omniverse package made of a USDA stage, companion MDL materials, and a JSON manifest that should be kept in the same folder when loading the stage in Omniverse USD Composer.

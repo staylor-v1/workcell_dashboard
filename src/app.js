@@ -1,4 +1,4 @@
-import { designMetrics, designToml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, renderBoardSvg, renderPrompt, reportPdf } from './data.js';
+import { designMetrics, designToml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, omniversePackage, renderBoardSvg, renderPrompt, reportPdf } from './data.js';
 
 const tabs = factoryDesign.ui.tabs;
 
@@ -476,17 +476,26 @@ function downloadText(filename, contents, type) {
   URL.revokeObjectURL(url);
 }
 
+function downloadFiles(files) {
+  files.forEach(({ filename, contents, type }) => downloadText(filename, contents, type));
+}
+
 function handleExport(kind) {
   const envelope = selectedEnvelope();
   const slug = factoryDesign.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const exporters = {
-    step: [`${slug}.step`, factoryStep({ envelope }), 'model/step'],
+    step: [`${slug}-professional-cad-assembly.step`, factoryStep({ envelope }), 'model/step'],
+    omniverse: omniversePackage({ envelope }),
     toml: [`${slug}.toml`, designToml({ envelope }), 'text/plain'],
     images: [`${slug}-render-board.svg`, renderBoardSvg({ envelope }), 'image/svg+xml'],
     pdf: [`${slug}-report.pdf`, reportPdf({ envelope }), 'application/pdf'],
   };
   const file = exporters[kind];
-  if (file) downloadText(...file);
+  if (Array.isArray(file?.[0]) || typeof file?.[0] === 'object') {
+    downloadFiles(file);
+  } else if (file) {
+    downloadText(...file);
+  }
 }
 
 export function view() {

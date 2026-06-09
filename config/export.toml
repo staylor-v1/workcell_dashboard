@@ -29,3 +29,9 @@ id = "pdf"
 label = "PDF report"
 extension = ".pdf"
 detail = "Client-side report package summarizing envelope selection, machine metrics, render prompts, and included export files."
+
+[[export_packages]]
+id = "omniverse"
+label = "NVIDIA Omniverse USD"
+extension = ".usda + .mdl"
+detail = "Multi-file USD handoff for NVIDIA Omniverse: a meter-scale USDA stage, MDL material library, and JSON manifest that preserve the envelope, machine placements, and product-flow references."

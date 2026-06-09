@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, renderBoardSvg, renderPrompt, reportPdf } from '../src/data.js';
+import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, omniversePackage, renderBoardSvg, renderPrompt, reportPdf } from '../src/data.js';
 import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderFlow, renderLayout, tabs } from '../src/app.js';
 import { parseToml } from '../src/toml.js';
 
@@ -92,18 +92,32 @@ test('envelope tab provides researched defaults, custom dimensions, and CAD prev
   assert.match(cadMarkup, /CAD preview for 40ft Conex/);
 });
 
-test('export tab generates STEP, TOML, render-board SVG, and PDF package content', () => {
+test('export tab generates Omniverse USD, STEP, TOML, render-board SVG, and PDF package content', () => {
   const exportMarkup = renderExport();
   const step = factoryStep();
+  const omniverse = omniversePackage();
   const toml = designToml();
   const svg = renderBoardSvg();
   const pdf = reportPdf();
 
+  assert.match(exportMarkup, /Download \.usda \+ \.mdl/);
   assert.match(exportMarkup, /Download \.step/);
   assert.match(exportMarkup, /Download \.toml/);
   assert.match(exportMarkup, /Download \.svg/);
   assert.match(exportMarkup, /Download \.pdf/);
   assert.match(step, /ISO-10303-21/);
+  assert.match(step, /professional CAD STEP assembly/);
+  assert.match(step, /ASTER_MICROFACTORY_FULL_ASSEMBLY/);
+  assert.equal(omniverse.length, 3);
+  assert.deepEqual(omniverse.map((file) => file.filename), [
+    'aster-microfactory-concept-omniverse.usda',
+    'microfactory_materials.mdl',
+    'aster-microfactory-concept-omniverse-manifest.json',
+  ]);
+  assert.match(omniverse[0].contents, /#usda 1\.0/);
+  assert.match(omniverse[0].contents, /NVIDIA|Omniverse|metersPerUnit = 1/);
+  assert.match(omniverse[1].contents, /export material brushed_anodized/);
+  assert.equal(JSON.parse(omniverse[2].contents).format, 'NVIDIA Omniverse USD package');
   assert.match(toml, /\[envelope\]/);
   assert.equal(parseToml(toml).envelope.id, factoryDesign.envelopeOptions[0].id);
   assert.match(svg, /Photorealistic render board/);
