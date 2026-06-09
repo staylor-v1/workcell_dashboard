@@ -20,6 +20,7 @@ const appState = {
   footprintOverrides: {},
   layoutViewBox: null,
   layoutViewBoxEnvelopeKey: '',
+  collapsedMachineCategories: [],
   currentProjectId: '',
   currentProjectName: '',
   projects: [],
@@ -83,6 +84,7 @@ function baseProjectState(project = {}) {
     footprintOverrides: {},
     layoutViewBox: null,
     layoutViewBoxEnvelopeKey: '',
+    collapsedMachineCategories: [],
     ...project,
   };
 }
@@ -313,7 +315,7 @@ function layoutEnvelopeKey() {
 
 function defaultLayoutViewBox() {
   const bounds = layoutEnvelopeBounds();
-  const padding = Math.max(Math.min(bounds.width, bounds.height) * 0.035, 0.12);
+  const padding = Math.max(Math.min(bounds.width, bounds.height) * 0.035, 0.45);
   return {
     x: -padding,
     y: -padding,
@@ -422,8 +424,8 @@ function layoutSvg({ compact = false } = {}) {
 
   const envelopes = envelopeEntries
     .map((entry) => `
-        <rect x="${entry.x}" y="${entry.y}" width="${entry.envelope.dimensions.length}" height="${entry.envelope.dimensions.width}" class="envelope-boundary" />
-        <text x="${entry.x + 0.24}" y="${entry.y + 0.38}" class="envelope-label">${entry.envelope.name}</text>`)
+        <text x="${entry.x + 0.24}" y="${entry.y - 0.18}" class="envelope-label">${entry.envelope.name}</text>
+        <rect x="${entry.x}" y="${entry.y}" width="${entry.envelope.dimensions.length}" height="${entry.envelope.dimensions.width}" class="envelope-boundary" />`)
     .join('');
 
   return `
@@ -590,6 +592,7 @@ function footprintDimensions(machine) {
 
 function machinePalette() {
   const categories = [...new Set(factoryDesign.machineCatalog.map((machine) => machine.category))];
+  const collapsedCategories = appState.collapsedMachineCategories ?? [];
   return `
     <aside class="machine-palette" aria-label="Machine catalog">
       <div class="machine-palette__header">
@@ -597,32 +600,44 @@ function machinePalette() {
         <h2>Industrial machine candidates</h2>
         <p>Researched small and medium facility equipment, biased toward industrial machines with approximately 300 mm-class useful build or travel envelopes.</p>
       </div>
-      ${categories.map((category) => `
-        <section class="machine-palette__group">
-          <h3>${category}</h3>
-          ${factoryDesign.machineCatalog
-            .filter((machine) => machine.category === category)
-            .map((machine) => `
-              <article class="palette-machine" draggable="true" data-catalog-machine-id="${machine.id}" tabindex="0">
-                <div>
-                  <strong>${machine.name}</strong>
-                  <span>${machine.type}</span>
-                </div>
-                <dl class="palette-machine__dimensions" aria-label="Machine dimensions">
+      ${categories.map((category, index) => {
+        const machines = factoryDesign.machineCatalog.filter((machine) => machine.category === category);
+        const collapsed = collapsedCategories.includes(category);
+        const categoryPanelId = `machine-category-${index + 1}`;
+        return `
+        <section class="machine-palette__group ${collapsed ? 'is-collapsed' : ''}" data-machine-category="${category}">
+          <button class="machine-palette__group-toggle" type="button" data-toggle-machine-category="${category}" aria-expanded="${collapsed ? 'false' : 'true'}" aria-controls="${categoryPanelId}">
+            <span>
+              <strong>${category}</strong>
+              <small>${machines.length} candidates</small>
+            </span>
+            <span class="machine-palette__group-caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="machine-palette__items" id="${categoryPanelId}" ${collapsed ? 'hidden' : ''}>
+            ${machines
+              .map((machine) => `
+                <article class="palette-machine" draggable="true" data-catalog-machine-id="${machine.id}" tabindex="0">
                   <div>
-                    <dt>Working envelope</dt>
-                    <dd>${machine.buildVolume}</dd>
+                    <strong>${machine.name}</strong>
+                    <span>${machine.type}</span>
                   </div>
-                  <div>
-                    <dt>Footprint</dt>
-                    <dd>${footprintDimensions(machine)}</dd>
-                  </div>
-                </dl>
-                <p>${machine.researchNote}</p>
-                <a href="${machine.sourceUrl}" target="_blank" rel="noreferrer">${machine.sourceLabel}</a>
-              </article>`)
-            .join('')}
-        </section>`)
+                  <dl class="palette-machine__dimensions" aria-label="Machine dimensions">
+                    <div>
+                      <dt>Working envelope</dt>
+                      <dd>${machine.buildVolume}</dd>
+                    </div>
+                    <div>
+                      <dt>Footprint</dt>
+                      <dd>${footprintDimensions(machine)}</dd>
+                    </div>
+                  </dl>
+                  <p>${machine.researchNote}</p>
+                  <a href="${machine.sourceUrl}" target="_blank" rel="noreferrer">${machine.sourceLabel}</a>
+                </article>`)
+              .join('')}
+          </div>
+        </section>`;
+      })
         .join('')}
     </aside>`;
 }
@@ -659,6 +674,7 @@ function dropMachineOnLayout(root, catalogMachineId, clientX, clientY) {
 
   appState.placedMachines = [...appState.placedMachines, placedMachine];
   appState.selectedMachineId = placedMachine.id;
+  appState.collapsedMachineCategories = [...new Set([...(appState.collapsedMachineCategories ?? []), catalogMachine.category])];
   scheduleProjectAutosave();
   renderApp(root);
 }
@@ -1355,6 +1371,18 @@ export function bindApp(root = document.querySelector('#root')) {
       return;
     }
 
+    const toggleCategoryTarget = event.target.closest('[data-toggle-machine-category]');
+    if (toggleCategoryTarget) {
+      const category = toggleCategoryTarget.dataset.toggleMachineCategory;
+      const collapsedCategories = appState.collapsedMachineCategories ?? [];
+      appState.collapsedMachineCategories = collapsedCategories.includes(category)
+        ? collapsedCategories.filter((collapsedCategory) => collapsedCategory !== category)
+        : [...collapsedCategories, category];
+      scheduleProjectAutosave();
+      renderApp(root);
+      return;
+    }
+
     const deleteMachineTarget = event.target.closest('[data-delete-machine-id]');
     if (deleteMachineTarget) {
       deleteMachineFromLayout(deleteMachineTarget.dataset.deleteMachineId);
@@ -1448,6 +1476,18 @@ export function bindApp(root = document.querySelector('#root')) {
   });
 
   root.addEventListener('keydown', (event) => {
+    const toggleCategoryTarget = event.target.closest('[data-toggle-machine-category]');
+    if (toggleCategoryTarget) {
+      const category = toggleCategoryTarget.dataset.toggleMachineCategory;
+      const collapsedCategories = appState.collapsedMachineCategories ?? [];
+      appState.collapsedMachineCategories = collapsedCategories.includes(category)
+        ? collapsedCategories.filter((collapsedCategory) => collapsedCategory !== category)
+        : [...collapsedCategories, category];
+      scheduleProjectAutosave();
+      renderApp(root);
+      return;
+    }
+
     const deleteMachineTarget = event.target.closest('[data-delete-machine-id]');
     if (deleteMachineTarget && ['Enter', ' '].includes(event.key)) {
       event.preventDefault();

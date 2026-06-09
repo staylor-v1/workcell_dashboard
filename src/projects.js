@@ -53,6 +53,7 @@ export function projectTomlFromState(state) {
     field('selectedRenderEngineId', state.selectedRenderEngineId),
     field('selectedResolutionId', state.selectedResolutionId),
     field('removedMachineIds', state.removedMachineIds ?? []),
+    field('collapsedMachineCategories', state.collapsedMachineCategories ?? []),
     '',
     '[customEnvelope]',
     field('length', Number(state.customEnvelope?.length ?? 0)),
@@ -177,6 +178,7 @@ export function projectStateFromToml(source, defaults = {}) {
     selectedRenderEngineId: project.selectedRenderEngineId || defaults.selectedRenderEngineId || factoryDesign.renderEngines[0].id,
     selectedResolutionId: project.selectedResolutionId || defaults.selectedResolutionId || '2k',
     removedMachineIds: Array.isArray(project.removedMachineIds) ? project.removedMachineIds : (defaults.removedMachineIds ?? factoryDesign.machines.map((machine) => machine.id)),
+    collapsedMachineCategories: Array.isArray(project.collapsedMachineCategories) ? project.collapsedMachineCategories : (defaults.collapsedMachineCategories ?? []),
     customEnvelope: {
       length: numberOrFallback(customEnvelope.length, defaults.customEnvelope?.length ?? factoryDesign.ui.defaults.customEnvelope.length),
       width: numberOrFallback(customEnvelope.width, defaults.customEnvelope?.width ?? factoryDesign.ui.defaults.customEnvelope.width),

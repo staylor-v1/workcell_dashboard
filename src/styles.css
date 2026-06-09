@@ -265,7 +265,15 @@ body.is-panning-layout .layout-canvas { cursor: grabbing; }
 .machine-palette__header h2 { margin: .45rem 0; }
 .machine-palette__header p { margin-bottom: 0; font-size: .9rem; }
 .machine-palette__group { display: grid; gap: .7rem; margin-bottom: 1rem; }
-.machine-palette__group h3 { margin: .25rem 0 0; color: var(--accent); font-size: .84rem; letter-spacing: .12em; text-transform: uppercase; }
+.machine-palette__group-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: .75rem; border: 1px solid rgba(62, 231, 198, .2); border-radius: 16px; padding: .7rem .8rem; color: var(--text); background: rgba(15, 23, 42, .62); text-align: left; transition: border-color .2s ease, background .2s ease; }
+.machine-palette__group-toggle:hover, .machine-palette__group-toggle:focus-visible { border-color: rgba(62, 231, 198, .55); background: rgba(62, 231, 198, .08); outline: none; }
+.machine-palette__group-toggle span:first-child { display: grid; gap: .18rem; }
+.machine-palette__group-toggle strong { color: var(--accent); font-size: .84rem; letter-spacing: .12em; text-transform: uppercase; }
+.machine-palette__group-toggle small { color: var(--muted); font-size: .75rem; font-weight: 800; }
+.machine-palette__group-caret { color: var(--accent); transition: transform .2s ease; }
+.machine-palette__group.is-collapsed .machine-palette__group-caret { transform: rotate(-90deg); }
+.machine-palette__items { display: grid; gap: .7rem; }
+.machine-palette__items[hidden] { display: none; }
 .palette-machine { display: grid; gap: .55rem; padding: .85rem; border: 1px solid rgba(148, 163, 184, .2); border-radius: 18px; background: linear-gradient(160deg, rgba(15, 23, 42, .82), rgba(2, 6, 23, .52)); cursor: grab; transition: transform .2s ease, border-color .2s ease, background .2s ease; }
 .palette-machine:hover, .palette-machine:focus-visible { transform: translateY(-2px); border-color: rgba(62, 231, 198, .5); background: linear-gradient(160deg, rgba(62, 231, 198, .13), rgba(2, 6, 23, .55)); outline: none; }
 .palette-machine:active { cursor: grabbing; }
