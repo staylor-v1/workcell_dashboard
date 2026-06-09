@@ -14,6 +14,8 @@ const appState = {
   customResolution: { ...factoryDesign.renderResolutions.find((resolution) => resolution.id === 'custom') },
   showCustomResolutionModal: false,
   renderStatus: '',
+  renderImages: [],
+  fullscreenRenderImageIndex: null,
   placedMachines: [],
   layoutEnvelopes: [],
   removedMachineIds: [...defaultMachineIds],
@@ -78,6 +80,8 @@ function baseProjectState(project = {}) {
     customResolution: { ...factoryDesign.renderResolutions.find((resolution) => resolution.id === 'custom') },
     showCustomResolutionModal: false,
     renderStatus: '',
+    renderImages: [],
+    fullscreenRenderImageIndex: null,
     placedMachines: [],
     layoutEnvelopes: [],
     removedMachineIds: [...defaultMachineIds],
@@ -99,6 +103,8 @@ function applyProjectState(project) {
     projectReady: Boolean(project.currentProjectId),
     showCustomResolutionModal: false,
     renderStatus: '',
+    renderImages: [],
+    fullscreenRenderImageIndex: null,
   });
   if (!findLayoutMachine(appState.selectedMachineId)) {
     appState.selectedMachineId = layoutMachines()[0]?.id ?? '';
@@ -972,6 +978,44 @@ function renderResolutionModal() {
     </div>`;
 }
 
+
+function renderOutputLabel(image, index) {
+  return image.label ?? image.viewTitle ?? image.output ?? `Render output ${index + 1}`;
+}
+
+function renderImageGallery() {
+  const images = appState.renderImages ?? [];
+  if (!images.length) return '';
+  const selectedImage = Number.isInteger(appState.fullscreenRenderImageIndex)
+    ? images[appState.fullscreenRenderImageIndex]
+    : null;
+  const gallery = `
+    <section class="render-output-panel" aria-label="Completed render output images">
+      <div class="panel-heading">
+        <div><span class="eyebrow">Completed outputs</span><h2>Rendered images</h2></div>
+        <small>Click any image to view it fullscreen.</small>
+      </div>
+      <div class="render-output-grid">
+        ${images.map((image, index) => `
+          <button class="render-output-card" type="button" data-render-image-index="${index}" aria-label="Open ${renderOutputLabel(image, index)} fullscreen">
+            <img src="${image.url}" alt="${renderOutputLabel(image, index)}" loading="lazy" />
+            <span>${renderOutputLabel(image, index)}</span>
+          </button>`).join('')}
+      </div>
+    </section>`;
+
+  if (!selectedImage) return gallery;
+  const selectedLabel = renderOutputLabel(selectedImage, appState.fullscreenRenderImageIndex);
+  return `${gallery}
+    <div class="modal-backdrop render-fullscreen-backdrop" role="presentation" data-close-render-fullscreen="true">
+      <section class="render-fullscreen-modal" role="dialog" aria-modal="true" aria-label="${selectedLabel} fullscreen render output">
+        <button class="render-fullscreen-close" type="button" data-close-render-fullscreen="true" aria-label="Close fullscreen render">×</button>
+        <img src="${selectedImage.url}" alt="${selectedLabel}" />
+        <strong>${selectedLabel}</strong>
+      </section>
+    </div>`;
+}
+
 function renderRenders() {
   const engine = getRenderEngine(appState.selectedRenderEngineId);
   const resolution = selectedRenderResolution();
@@ -1005,6 +1049,7 @@ function renderRenders() {
             <p>${renderViewPlan(engine, view, factoryDesign, resolution)}</p>
           </article>`).join('')}
       </div>
+      ${renderImageGallery()}
       <label class="prompt-label" for="render-job-manifest">One-click render job manifest</label>
       <textarea id="render-job-manifest" class="render-manifest" readonly>${renderJobManifest(engine, factoryDesign, resolution)}</textarea>
       ${renderResolutionModal()}
@@ -1332,18 +1377,38 @@ export function bindApp(root = document.querySelector('#root')) {
       const resolution = selectedRenderResolution();
       appState.selectedRenderEngineId = engine.id;
       appState.renderStatus = `${engine.name} render job starting at ${resolution.width} × ${resolution.height}.`;
+      appState.renderImages = [];
+      appState.fullscreenRenderImageIndex = null;
       renderApp(root);
       startRenderJob(engine, resolution)
         .then((job) => {
-          appState.renderStatus = job.rendererAvailable
-            ? `${engine.name} render complete: ${job.outputs.join(', ')}`
-            : `${engine.name} scene generated at ${job.jobDir}; ${job.executable} was not found on the server PATH. Install ${job.executable} or set ${job.executableEnvVar} to its full executable path, then restart the server.`;
+          appState.renderImages = job.outputImages ?? [];
+          appState.fullscreenRenderImageIndex = null;
+          appState.renderStatus = appState.renderImages.length
+            ? `${engine.name} render complete: ${appState.renderImages.length} output images ready.`
+            : job.rendererAvailable
+              ? `${engine.name} render complete: ${job.outputs.join(', ')}`
+              : `${engine.name} scene generated at ${job.jobDir}; ${job.executable} was not found on the server PATH. Install ${job.executable} or set ${job.executableEnvVar} to its full executable path, then restart the server.`;
           renderApp(root);
         })
         .catch((error) => {
           appState.renderStatus = `${engine.name} render setup failed: ${error.message}`;
           renderApp(root);
         });
+      return;
+    }
+
+    const renderImageTarget = event.target.closest('[data-render-image-index]');
+    if (renderImageTarget) {
+      appState.fullscreenRenderImageIndex = Number(renderImageTarget.dataset.renderImageIndex);
+      renderApp(root);
+      return;
+    }
+
+    const closeRenderFullscreen = event.target.closest('[data-close-render-fullscreen]');
+    if (closeRenderFullscreen && (event.target === closeRenderFullscreen || event.target.closest('.render-fullscreen-close'))) {
+      appState.fullscreenRenderImageIndex = null;
+      renderApp(root);
       return;
     }
 
@@ -1367,6 +1432,12 @@ export function bindApp(root = document.querySelector('#root')) {
       appState.layoutEnvelopes = (appState.layoutEnvelopes ?? []).filter((entry) => entry.instanceId !== removeLayoutEnvelope.dataset.removeLayoutEnvelope);
       appState.layoutViewBox = null;
       scheduleProjectAutosave();
+      renderApp(root);
+      return;
+    }
+
+    if (event.key === 'Escape' && Number.isInteger(appState.fullscreenRenderImageIndex)) {
+      appState.fullscreenRenderImageIndex = null;
       renderApp(root);
       return;
     }
@@ -1476,6 +1547,12 @@ export function bindApp(root = document.querySelector('#root')) {
   });
 
   root.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && Number.isInteger(appState.fullscreenRenderImageIndex)) {
+      appState.fullscreenRenderImageIndex = null;
+      renderApp(root);
+      return;
+    }
+
     const toggleCategoryTarget = event.target.closest('[data-toggle-machine-category]');
     if (toggleCategoryTarget) {
       const category = toggleCategoryTarget.dataset.toggleMachineCategory;
