@@ -93,6 +93,10 @@ function viewBoxAttribute(viewBox) {
   return `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`;
 }
 
+function machineModelNumber(machine) {
+  return machine.modelNumber ?? machine.model ?? machine.name;
+}
+
 function layoutSvg({ compact = false } = {}) {
   const envelope = selectedEnvelope();
   const viewBox = compact
@@ -127,7 +131,7 @@ function layoutSvg({ compact = false } = {}) {
         <g class="layout-machine${selectedClass}" data-machine-id="${machine.id}" data-layout-draggable="true" tabindex="0" role="button" aria-label="Select and drag ${machine.name}">
           <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="0.18" />
           <text x="${x + w / 2}" y="${y + h / 2 - 0.12}" text-anchor="middle">${machine.name.split(' ')[0]}</text>
-          <text class="layout-machine__sub" x="${x + w / 2}" y="${y + h / 2 + 0.22}" text-anchor="middle">${machine.cycleTime}s takt</text>
+          <text class="layout-machine__sub" x="${x + w / 2}" y="${y + h / 2 + 0.22}" text-anchor="middle">${machineModelNumber(machine)}</text>
         </g>
         ${rotateControl}
         ${deleteControl}`;
