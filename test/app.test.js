@@ -69,6 +69,14 @@ test('layout view exposes researched drag-and-drop industrial machine candidates
   assert.match(layoutMarkup, /Nikon SLM Solutions SLM 280 2.0/);
   assert.match(layoutMarkup, /Mitsubishi MV1200S/);
   assert.match(layoutMarkup, /Brother SPEEDIO S300X2/);
+  assert.match(layoutMarkup, /Working envelope/);
+  assert.match(layoutMarkup, /Footprint/);
+  assert.match(layoutMarkup, /250 × 250 × 325 mm/);
+  assert.match(layoutMarkup, /2.5m × 1.3m/);
+  assert.match(layoutMarkup, /300 × 400 × 300 mm travel/);
+  assert.match(layoutMarkup, /1.08m × 2.463m/);
+  assert.equal((layoutMarkup.match(/Working envelope/g) ?? []).length, factoryDesign.machineCatalog.length);
+  assert.equal((layoutMarkup.match(/Footprint/g) ?? []).length, factoryDesign.machineCatalog.length);
   assert.match(layoutMarkup, /draggable="true"/);
 
   const nikon = factoryDesign.machineCatalog.find((machine) => machine.id === 'nikon-slm280-2');
