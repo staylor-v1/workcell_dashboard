@@ -1,7 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { accessSync, constants, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { factoryDesign, getRenderEngine, getRenderResolution, normalizedRenderResolution, renderJobManifest } from '../src/data.js';
 
 const args = new Map();
@@ -149,14 +150,66 @@ function luxCoreCfg(view) {
   return `scene.file = ${join(outDir, `${view.id}.scn`)}\nrenderengine.type = PATHCPU\nsampler.type = SOBOL\npath.pathdepth.total = 12\npath.russianroulette.depth = 5\nbatch.haltspp = ${engine.samples}\nfilm.width = ${resolution.width}\nfilm.height = ${resolution.height}\nfilm.outputs.1.type = RGB_IMAGEPIPELINE\nfilm.outputs.1.filename = ${join(outDir, view.output)}\n`;
 }
 
-function executableForEngine() {
-  if (engine.id === 'blender-cycles') return 'blender';
-  if (engine.id === 'luxcore') return 'luxcoreconsole';
+function executableEnvVarName(engineId = engine.id) {
+  if (engineId === 'blender-cycles') return 'MICROFACTORY_BLENDER_BIN';
+  if (engineId === 'luxcore') return 'MICROFACTORY_LUXCORE_BIN';
+  return 'MICROFACTORY_MITSUBA_BIN';
+}
+
+function executableForEngine(engineId = engine.id, env = process.env) {
+  const configuredExecutable = env[executableEnvVarName(engineId)];
+  if (configuredExecutable) return configuredExecutable;
+  if (engineId === 'blender-cycles') return 'blender';
+  if (engineId === 'luxcore') return 'luxcoreconsole';
   return 'mitsuba';
 }
 
-function commandExists(command) {
-  return spawnSync('sh', ['-lc', `command -v ${command}`], { encoding: 'utf8' }).status === 0;
+function isRunnableExecutable(path, platform = process.platform) {
+  if (!existsSync(path)) return false;
+  if (platform === 'win32') return true;
+  try {
+    accessSync(path, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function pathValue(env = process.env) {
+  return env.PATH ?? env.Path ?? env.path ?? '';
+}
+
+function windowsExecutableNames(command, env = process.env) {
+  const extensions = (env.PATHEXT || '.COM;.EXE;.BAT;.CMD')
+    .split(';')
+    .filter(Boolean);
+  const lowerCommand = command.toLowerCase();
+  const hasExecutableExtension = extensions.some((extension) => lowerCommand.endsWith(extension.toLowerCase()));
+  return hasExecutableExtension ? [command] : extensions.map((extension) => `${command}${extension}`);
+}
+
+export function resolveExecutable(command, { platform = process.platform, env = process.env } = {}) {
+  if (!command) return null;
+  if (command.includes('/') || command.includes('\\')) {
+    return isRunnableExecutable(command, platform) ? command : null;
+  }
+
+  const pathEntries = pathValue(env)
+    .split(platform === 'win32' ? ';' : delimiter)
+    .filter(Boolean);
+  const candidates = platform === 'win32' ? windowsExecutableNames(command, env) : [command];
+  for (const pathEntry of pathEntries) {
+    for (const candidate of candidates) {
+      const executablePath = join(pathEntry, candidate);
+      if (isRunnableExecutable(executablePath, platform)) return executablePath;
+    }
+  }
+
+  const lookup = platform === 'win32'
+    ? spawnSync('where.exe', [command], { encoding: 'utf8', env })
+    : spawnSync('sh', ['-lc', `command -v -- ${JSON.stringify(command)}`], { encoding: 'utf8', env });
+  if (lookup.status !== 0) return null;
+  return lookup.stdout.trim().split(/\r?\n/)[0] || command;
 }
 
 async function main() {
@@ -171,13 +224,14 @@ async function main() {
   await Promise.all(scene.machines.map((_, index) => writeFile(join(outDir, `machine_${index}.ply`), unitCubePly())));
 
   const executable = executableForEngine();
-  const rendererAvailable = commandExists(executable);
+  const resolvedExecutable = resolveExecutable(executable);
+  const rendererAvailable = Boolean(resolvedExecutable);
   const outputs = scene.views.map((view) => join(outDir, view.output));
   const commands = engine.id === 'blender-cycles'
-    ? [[executable, ['--background', '--python', join(outDir, 'blender_factory_render.py')]]]
+    ? [[resolvedExecutable ?? executable, ['--background', '--python', join(outDir, 'blender_factory_render.py')]]]
     : engine.id === 'luxcore'
-      ? scene.views.map((view) => [executable, [join(outDir, `${view.id}.cfg`)]])
-      : scene.views.map((view) => [executable, ['render', '-o', join(outDir, view.output), join(outDir, `${view.id}.xml`)]]);
+      ? scene.views.map((view) => [resolvedExecutable ?? executable, [join(outDir, `${view.id}.cfg`)]])
+      : scene.views.map((view) => [resolvedExecutable ?? executable, ['render', '-o', join(outDir, view.output), join(outDir, `${view.id}.xml`)]]);
 
   const executed = [];
   if (execute && rendererAvailable) {
@@ -188,9 +242,11 @@ async function main() {
     }
   }
 
-  const result = { engineId: engine.id, executable, rendererAvailable, executed, jobDir: outDir, outputs, scene: join(outDir, 'scene.json') };
+  const result = { engineId: engine.id, executable, resolvedExecutable, rendererAvailable, executableEnvVar: executableEnvVarName(), executed, jobDir: outDir, outputs, scene: join(outDir, 'scene.json') };
   await writeFile(join(outDir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
   console.log(JSON.stringify(result, null, 2));
 }
 
-main();
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main();
+}

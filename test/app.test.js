@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -11,6 +11,7 @@ import { parseToml } from '../src/toml.js';
 import { projectStateFromToml, projectTomlFromState, slugifyProjectName } from '../src/projects.js';
 import { createProjectApi } from '../project-api.mjs';
 import { createMicrofactoryServer } from '../server.mjs';
+import { resolveExecutable } from '../scripts/render-factory.mjs';
 
 test('factory design contains required coordinated views loaded from TOML source files', () => {
   assert.deepEqual(tabs.map((tab) => tab.id), ['projects', 'summary', 'machines', 'layout', 'envelope', 'flow', 'renders', 'export']);
@@ -391,6 +392,18 @@ test('export tab generates Omniverse USD, STEP, TOML, render-board SVG, and PDF 
   assert.match(pdf, /%PDF-1\.4/);
 });
 
+
+test('renderer executable discovery honors direct PATH lookup and Windows PATHEXT', async () => {
+  const binDir = await mkdtemp(join(tmpdir(), 'microfactory-render-bin-'));
+  const posixMitsuba = join(binDir, 'mitsuba');
+  const windowsMitsuba = join(binDir, 'mitsuba.EXE');
+  await writeFile(posixMitsuba, '#!/bin/sh\nexit 0\n');
+  await chmod(posixMitsuba, 0o755);
+  await writeFile(windowsMitsuba, '');
+
+  assert.equal(resolveExecutable('mitsuba', { platform: 'linux', env: { PATH: binDir } }), posixMitsuba);
+  assert.equal(resolveExecutable('mitsuba', { platform: 'win32', env: { Path: binDir, PATHEXT: '.EXE;.CMD' } }), windowsMitsuba);
+});
 
 test('machine STEP assets exist for every layout-available machine and render script writes deterministic scenes', async () => {
   const machines = [...factoryDesign.machines, ...factoryDesign.machineCatalog];
