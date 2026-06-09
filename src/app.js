@@ -260,6 +260,10 @@ function renderMachines() {
     </section>`;
 }
 
+function footprintDimensions(machine) {
+  return `${machine.footprint.w}m × ${machine.footprint.h}m`;
+}
+
 function machinePalette() {
   const categories = [...new Set(factoryDesign.machineCatalog.map((machine) => machine.category))];
   return `
@@ -280,7 +284,16 @@ function machinePalette() {
                   <strong>${machine.name}</strong>
                   <span>${machine.type}</span>
                 </div>
-                <small>${machine.buildVolume}</small>
+                <dl class="palette-machine__dimensions" aria-label="Machine dimensions">
+                  <div>
+                    <dt>Working envelope</dt>
+                    <dd>${machine.buildVolume}</dd>
+                  </div>
+                  <div>
+                    <dt>Footprint</dt>
+                    <dd>${footprintDimensions(machine)}</dd>
+                  </div>
+                </dl>
                 <p>${machine.researchNote}</p>
                 <a href="${machine.sourceUrl}" target="_blank" rel="noreferrer">${machine.sourceLabel}</a>
               </article>`)
