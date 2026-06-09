@@ -183,25 +183,193 @@ export function designToml({ design = factoryDesign, envelope = getEnvelope('con
   return lines.join('\n').trimEnd();
 }
 
+function stepSafe(value) {
+  return String(value).replaceAll("'", "");
+}
+
+function stepProductLine(id, name, description, contextId) {
+  return `#${id}=PRODUCT('${stepSafe(name)}','${stepSafe(name)}','${stepSafe(description)}',(#${contextId}));`;
+}
+
+function machineCenter(machine) {
+  return {
+    x: Number((machine.footprint.x + machine.footprint.w / 2).toFixed(3)),
+    y: Number((machine.footprint.y + machine.footprint.h / 2).toFixed(3)),
+    z: 0,
+  };
+}
+
 export function factoryStep({ design = factoryDesign, envelope = getEnvelope('conex-40', design) } = {}) {
   const dims = envelope.dimensions;
-  const machines = design.machines
-    .map((machine, index) => `#${40 + index}=PRODUCT('MACHINE_${machine.id.toUpperCase()}','${machine.name}', 'footprint ${machine.footprint.w}m x ${machine.footprint.h}m', (#10));`)
+  const machineProducts = design.machines
+    .map((machine, index) => {
+      const center = machineCenter(machine);
+      return stepProductLine(
+        100 + index,
+        `MACHINE_${machine.id.toUpperCase()}`,
+        `${machine.name}; asset=${machine.assetPath}; footprint=${machine.footprint.w}m x ${machine.footprint.h}m; placement=${center.x},${center.y},${center.z}m`,
+        10,
+      );
+    })
     .join('\n');
+  const machineRepresentations = design.machines
+    .map((machine, index) => {
+      const center = machineCenter(machine);
+      return `#${200 + index}=PROPERTY_DEFINITION('CAD_PLACEMENT_${machine.id}','${machine.name} bounding-box placement in metres',#${100 + index});
+#${300 + index}=DESCRIPTIVE_REPRESENTATION_ITEM('placement_xyz_m','${center.x}, ${center.y}, ${center.z}');
+#${400 + index}=DESCRIPTIVE_REPRESENTATION_ITEM('size_lwh_m','${machine.footprint.w}, ${machine.footprint.h}, 1.8');`;
+    })
+    .join('\n');
+  const flow = design.flowLinks.map(([from, to]) => `${from}->${to}`).join('; ');
+
   return `ISO-10303-21;
 HEADER;
-FILE_DESCRIPTION(('Microfactory Studio whole factory envelope and machine placeholder assembly'),'2;1');
-FILE_NAME('${design.name.replaceAll("'", '')}.step','${design.exportMetadata.stepTimestamp}',('${design.exportMetadata.author}'),('${design.exportMetadata.organization}'), '${design.exportMetadata.preprocessor}','${design.exportMetadata.originatingSystem}','${design.exportMetadata.authorization}');
+FILE_DESCRIPTION(('Microfactory Studio professional CAD STEP assembly; envelope, floor datum, machine placements, asset references, and flow reference geometry'),'2;1');
+FILE_NAME('${stepSafe(design.name)}.step','${design.exportMetadata.stepTimestamp}',('${stepSafe(design.exportMetadata.author)}'),('${stepSafe(design.exportMetadata.organization)}'), '${stepSafe(design.exportMetadata.preprocessor)}','${stepSafe(design.exportMetadata.originatingSystem)}','${stepSafe(design.exportMetadata.authorization)}');
 FILE_SCHEMA(('AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF'));
 ENDSEC;
 DATA;
 #10=PRODUCT_CONTEXT('microfactory design',#20,'mechanical');
-#20=APPLICATION_CONTEXT('whole factory export');
-#30=PRODUCT('ENVELOPE_${envelope.id.toUpperCase()}','${envelope.name}','${dims.length}m x ${dims.width}m x ${dims.height}m parametric shell: ${envelope.cadModel.features.join(', ')}',(#10));
-${machines}
-#90=PRODUCT('PRODUCT_FLOW','${design.product} flow path','${design.flowLinks.map(([from, to]) => `${from}->${to}`).join('; ')}',(#10));
+#20=APPLICATION_CONTEXT('professional CAD assembly export');
+#30=PRODUCT('ASTER_MICROFACTORY_ASSEMBLY','${stepSafe(design.name)}','Full factory assembly for professional CAD import',(#10));
+#31=PRODUCT('ENVELOPE_${envelope.id.toUpperCase()}','${stepSafe(envelope.name)}','${dims.length}m x ${dims.width}m x ${dims.height}m parametric shell: ${stepSafe(envelope.cadModel.features.join(', '))}',(#10));
+#32=PRODUCT('FLOOR_DATUM','${design.floorSize.width}m x ${design.floorSize.height}m floor datum','Shared layout coordinate system in metres',(#10));
+${machineProducts}
+#90=PRODUCT('PRODUCT_FLOW','${stepSafe(design.product)} flow path','${stepSafe(flow)}',(#10));
+#91=PROPERTY_DEFINITION('ASSEMBLY_CONTENTS','${design.machines.length} positioned machines plus envelope and floor datum',#30);
+${machineRepresentations}
 ENDSEC;
 END-ISO-10303-21;`;
+}
+
+function usdString(value) {
+  return String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+}
+
+function usdIdentifier(value) {
+  return String(value).replace(/[^A-Za-z0-9_]/g, '_').replace(/^([0-9])/, '_$1');
+}
+
+export function omniverseUsd({ design = factoryDesign, envelope = getEnvelope('conex-40', design) } = {}) {
+  const dims = envelope.dimensions;
+  const machines = design.machines.map((machine) => {
+    const center = machineCenter(machine);
+    return `    def Xform "${usdIdentifier(machine.id)}" (
+        assetInfo = {
+            string assetPath = "${usdString(machine.assetPath)}"
+            string machineName = "${usdString(machine.name)}"
+        }
+    )
+    {
+        double3 xformOp:translate = (${center.x}, ${center.y}, 0.9)
+        double3 xformOp:scale = (${machine.footprint.w}, ${machine.footprint.h}, 1.8)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        def Cube "footprint_proxy" {
+            rel material:binding = </Looks/machine_blue>
+            string type = "${usdString(machine.type)}"
+            float cycleTimeSeconds = ${machine.cycleTime}
+            float uptimePercent = ${machine.uptime}
+        }
+    }`;
+  }).join('\n\n');
+  const flowCurves = design.flowLinks.map(([fromId, toId], index) => {
+    const from = design.machines.find((machine) => machine.id === fromId);
+    const to = design.machines.find((machine) => machine.id === toId);
+    if (!from || !to) return '';
+    const a = machineCenter(from);
+    const b = machineCenter(to);
+    return `    def BasisCurves "flow_${index + 1}_${usdIdentifier(fromId)}_to_${usdIdentifier(toId)}" {
+        uniform token type = "linear"
+        int[] curveVertexCounts = [2]
+        point3f[] points = [( ${a.x}, ${a.y}, 0.08 ), ( ${b.x}, ${b.y}, 0.08 )]
+        color3f[] primvars:displayColor = [(0.24, 0.91, 0.78)]
+        float[] widths = [0.055, 0.055]
+    }`;
+  }).filter(Boolean).join('\n\n');
+
+  return `#usda 1.0
+(
+    defaultPrim = "Factory"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+subLayers = [
+    @materials.usda@
+]
+
+def Xform "Factory" (
+    assetInfo = {
+        string project = "${usdString(design.name)}"
+        string product = "${usdString(design.product)}"
+        string envelope = "${usdString(envelope.name)}"
+    }
+)
+{
+    def Cube "envelope_clearance" {
+        double3 xformOp:translate = (${dims.length / 2}, ${dims.width / 2}, ${dims.height / 2})
+        double3 xformOp:scale = (${dims.length}, ${dims.width}, ${dims.height})
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        rel material:binding = </Looks/envelope_glass>
+    }
+
+    def Cube "floor_datum" {
+        double3 xformOp:translate = (${design.floorSize.width / 2}, ${design.floorSize.height / 2}, -0.025)
+        double3 xformOp:scale = (${design.floorSize.width}, ${design.floorSize.height}, 0.05)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        rel material:binding = </Looks/floor_dark>
+    }
+
+${machines}
+
+${flowCurves}
+}
+`;
+}
+
+export function omniverseMaterialsUsd() {
+  return `#usda 1.0
+
+def Scope "Looks"
+{
+    def Material "machine_blue" {
+        color3f inputs:diffuseColor = (0.17, 0.39, 0.92)
+        float inputs:roughness = 0.42
+    }
+
+    def Material "envelope_glass" {
+        color3f inputs:diffuseColor = (0.24, 0.91, 0.78)
+        float inputs:opacity = 0.18
+    }
+
+    def Material "floor_dark" {
+        color3f inputs:diffuseColor = (0.02, 0.04, 0.09)
+        float inputs:roughness = 0.65
+    }
+}
+`;
+}
+
+export function omniversePackageFiles({ design = factoryDesign, envelope = getEnvelope('conex-40', design) } = {}) {
+  const manifest = {
+    project: design.name,
+    product: design.product,
+    envelope: envelope.name,
+    units: 'meters',
+    rootLayer: 'factory.usda',
+    files: ['factory.usda', 'materials.usda', 'manifest.json', 'README.md'],
+    referencedStepAssets: design.machines.map((machine) => machine.assetPath),
+  };
+  const readme = `# ${design.name} Omniverse package
+
+Open \`factory.usda\` in NVIDIA Omniverse USD Composer, Create, or any USD-capable Omniverse application. The package contains metre-scale envelope, floor, machine footprint proxies, material bindings, product-flow guide curves, and references to source STEP asset paths for detailed machine replacement.
+`;
+  return [
+    { path: 'factory.usda', contents: omniverseUsd({ design, envelope }) },
+    { path: 'materials.usda', contents: omniverseMaterialsUsd({ design, envelope }) },
+    { path: 'manifest.json', contents: JSON.stringify(manifest, null, 2) },
+    { path: 'README.md', contents: readme },
+  ];
 }
 
 export function renderBoardSvg({ design = factoryDesign, envelope = getEnvelope('conex-40', design) } = {}) {

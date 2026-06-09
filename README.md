@@ -8,7 +8,7 @@ A React/Vite web application for designing and reasoning about a compact microfa
 - **Envelope** — container and building-envelope selector with Conex defaults, custom dimensions, generated CAD previews, and CAD model metadata.
 - **Flow** — text and visual graph representations of feedstock-to-finished-product transformations with a drag-to-resize divider between the text and visual panels.
 - **Renders** — photorealistic render-brief cards plus selectable Blender Cycles, LuxCoreRender, and Mitsuba 3 production defaults for one-click top-down, container-door, and orthographic factory render plans.
-- **Export** — client-side export actions for a whole-factory `.step`, design `.toml`, render-board `.svg`, and `.pdf` report package.
+- **Export** — client-side export actions for an NVIDIA Omniverse USD `.zip` package, a professional CAD `.step` assembly, design `.toml`, render-board `.svg`, and `.pdf` report package.
 
 
 ## Editable TOML configuration
@@ -21,7 +21,7 @@ Project-specific data lives in the `config/` directory so users can customize th
 - `config/flow.toml` — feedstock-to-finished transformation steps.
 - `config/envelopes.toml` — selectable factory envelopes, dimensions, clearances, and CAD metadata.
 - `config/renders.toml` — render briefs, cameras, lighting, materials, subjects, engine defaults, render views, and resolution presets.
-- `config/export.toml` — export package labels, extensions, and descriptions.
+- `config/export.toml` — export package labels, extensions, and descriptions, including Omniverse USD and professional CAD STEP handoff options.
 - `config/ui.toml` — tab labels, brand text, and default UI state.
 
 The app parses these TOML files in both Node-based validation and the browser. When building the static site, `npm run build` copies `config/` into `dist/config/` alongside the application assets.
@@ -54,4 +54,4 @@ The app can generate deterministic render jobs with complete scene descriptions 
 
 ## Envelope and export data
 
-The Envelope tab includes standard 20ft and 40ft Conex/ISO dry-container options, a 40ft high-cube option, modular cleanroom and deployable shelter structures, and a Custom option for user-defined dimensions. CAD previews and export files are generated parametrically from the shared design model.
+The Envelope tab includes standard 20ft and 40ft Conex/ISO dry-container options, a 40ft high-cube option, modular cleanroom and deployable shelter structures, and a Custom option for user-defined dimensions. CAD previews and export files are generated parametrically from the shared design model. The Export tab can now produce a ZIP of USD ASCII files (`factory.usda`, `materials.usda`, `manifest.json`, and `README.md`) for NVIDIA Omniverse, plus an AP242-style STEP assembly with envelope, floor datum, machine placements, asset references, and product-flow metadata for professional CAD tools.

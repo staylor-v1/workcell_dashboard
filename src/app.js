@@ -1,4 +1,4 @@
-import { designMetrics, designToml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, getRenderEngine, getRenderResolution, normalizedRenderResolution, renderBoardSvg, renderJobManifest, renderPrompt, renderViewPlan, reportPdf } from './data.js';
+import { designMetrics, designToml, envelopeVolume, factoryDesign, factoryStep, getEnvelope, getRenderEngine, getRenderResolution, normalizedRenderResolution, omniversePackageFiles, renderBoardSvg, renderJobManifest, renderPrompt, renderViewPlan, reportPdf } from './data.js';
 
 const tabs = factoryDesign.ui.tabs;
 
@@ -645,7 +645,7 @@ function renderExport() {
     <section class="workspace export-view">
       <span class="eyebrow">Design handoff</span>
       <h1>Export the whole factory package</h1>
-      <p>Generate neutral CAD, source TOML, photorealistic render boards, and a PDF report from the shared machine, flow, render, and envelope model.</p>
+      <p>Generate Omniverse USD packages, professional CAD STEP assemblies, source TOML, photorealistic render boards, and a PDF report from the shared machine, flow, render, and envelope model.</p>
       <aside class="export-summary">
         <strong>${factoryDesign.name}</strong>
         <span>${envelope.name}</span>
@@ -659,8 +659,7 @@ function renderExport() {
     </section>`;
 }
 
-function downloadText(filename, contents, type) {
-  const blob = new Blob([contents], { type });
+function downloadBlob(filename, blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -669,17 +668,100 @@ function downloadText(filename, contents, type) {
   URL.revokeObjectURL(url);
 }
 
+function downloadText(filename, contents, type) {
+  downloadBlob(filename, new Blob([contents], { type }));
+}
+
+function crc32(bytes) {
+  let crc = -1;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+function writeUint16(target, offset, value) {
+  target[offset] = value & 0xff;
+  target[offset + 1] = (value >>> 8) & 0xff;
+}
+
+function writeUint32(target, offset, value) {
+  target[offset] = value & 0xff;
+  target[offset + 1] = (value >>> 8) & 0xff;
+  target[offset + 2] = (value >>> 16) & 0xff;
+  target[offset + 3] = (value >>> 24) & 0xff;
+}
+
+function zipFiles(files) {
+  const encoder = new TextEncoder();
+  const entries = files.map((file) => ({
+    path: encoder.encode(file.path),
+    contents: encoder.encode(file.contents),
+  }));
+  const chunks = [];
+  const centralDirectory = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const checksum = crc32(entry.contents);
+    const local = new Uint8Array(30 + entry.path.length + entry.contents.length);
+    writeUint32(local, 0, 0x04034b50);
+    writeUint16(local, 4, 20);
+    writeUint16(local, 6, 0x0800);
+    writeUint16(local, 8, 0);
+    writeUint32(local, 14, checksum);
+    writeUint32(local, 18, entry.contents.length);
+    writeUint32(local, 22, entry.contents.length);
+    writeUint16(local, 26, entry.path.length);
+    local.set(entry.path, 30);
+    local.set(entry.contents, 30 + entry.path.length);
+    chunks.push(local);
+
+    const central = new Uint8Array(46 + entry.path.length);
+    writeUint32(central, 0, 0x02014b50);
+    writeUint16(central, 4, 20);
+    writeUint16(central, 6, 20);
+    writeUint16(central, 8, 0x0800);
+    writeUint16(central, 10, 0);
+    writeUint32(central, 16, checksum);
+    writeUint32(central, 20, entry.contents.length);
+    writeUint32(central, 24, entry.contents.length);
+    writeUint16(central, 28, entry.path.length);
+    writeUint32(central, 42, offset);
+    central.set(entry.path, 46);
+    centralDirectory.push(central);
+    offset += local.length;
+  }
+
+  const centralSize = centralDirectory.reduce((sum, chunk) => sum + chunk.length, 0);
+  const end = new Uint8Array(22);
+  writeUint32(end, 0, 0x06054b50);
+  writeUint16(end, 8, entries.length);
+  writeUint16(end, 10, entries.length);
+  writeUint32(end, 12, centralSize);
+  writeUint32(end, 16, offset);
+  return new Blob([...chunks, ...centralDirectory, end], { type: 'application/zip' });
+}
+
 function handleExport(kind) {
   const envelope = selectedEnvelope();
   const slug = factoryDesign.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const exporters = {
     step: [`${slug}.step`, factoryStep({ envelope }), 'model/step'],
+    'cad-step': [`${slug}-cad-assembly.step`, factoryStep({ envelope }), 'model/step'],
+    omniverse: [`${slug}-omniverse-usd.zip`, zipFiles(omniversePackageFiles({ envelope })), 'application/zip'],
     toml: [`${slug}.toml`, designToml({ envelope }), 'text/plain'],
     images: [`${slug}-render-board.svg`, renderBoardSvg({ envelope }), 'image/svg+xml'],
     pdf: [`${slug}-report.pdf`, reportPdf({ envelope }), 'application/pdf'],
   };
   const file = exporters[kind];
-  if (file) downloadText(...file);
+  if (!file) return;
+  if (file[1] instanceof Blob) {
+    downloadBlob(file[0], file[1]);
+    return;
+  }
+  downloadText(...file);
 }
 
 export function view() {
