@@ -7,6 +7,18 @@ originatingSystem = "Microfactory Studio"
 authorization = ""
 
 [[export_packages]]
+id = "omniverse"
+label = "NVIDIA Omniverse USD package"
+extension = ".zip"
+detail = "ZIP package containing factory.usda, materials.usda, a manifest, and loading notes for NVIDIA Omniverse USD Composer/Create workflows."
+
+[[export_packages]]
+id = "cad-step"
+label = "Professional CAD STEP assembly"
+extension = ".step"
+detail = "AP242 STEP assembly of the full design with envelope, floor datum, machine placements, asset references, and product-flow reference geometry for professional CAD import."
+
+[[export_packages]]
 id = "step"
 label = "Factory STEP"
 extension = ".step"

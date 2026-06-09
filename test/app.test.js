@@ -4,7 +4,7 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, getRenderEngine, getRenderResolution, renderBoardSvg, renderJobManifest, renderPrompt, renderViewPlan, reportPdf } from '../src/data.js';
+import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, getRenderEngine, getRenderResolution, omniversePackageFiles, omniverseUsd, renderBoardSvg, renderJobManifest, renderPrompt, renderViewPlan, reportPdf } from '../src/data.js';
 import { envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderExport, renderFlow, renderLayout, renderRenders, tabs } from '../src/app.js';
 import { parseToml } from '../src/toml.js';
 
@@ -130,18 +130,29 @@ test('envelope tab provides researched defaults, custom dimensions, and CAD prev
   assert.match(cadMarkup, /CAD preview for 40ft Conex/);
 });
 
-test('export tab generates STEP, TOML, render-board SVG, and PDF package content', () => {
+test('export tab generates Omniverse USD, STEP, TOML, render-board SVG, and PDF package content', () => {
   const exportMarkup = renderExport();
   const step = factoryStep();
   const toml = designToml();
   const svg = renderBoardSvg();
   const pdf = reportPdf();
+  const usd = omniverseUsd();
+  const omniverseFiles = omniversePackageFiles();
 
+  assert.match(exportMarkup, /NVIDIA Omniverse USD package/);
+  assert.match(exportMarkup, /Professional CAD STEP assembly/);
+  assert.match(exportMarkup, /Download \.zip/);
   assert.match(exportMarkup, /Download \.step/);
   assert.match(exportMarkup, /Download \.toml/);
   assert.match(exportMarkup, /Download \.svg/);
   assert.match(exportMarkup, /Download \.pdf/);
   assert.match(step, /ISO-10303-21/);
+  assert.match(step, /professional CAD STEP assembly/i);
+  assert.match(step, /CAD_PLACEMENT_prep/);
+  assert.match(usd, /#usda 1\.0/);
+  assert.match(usd, /defaultPrim = "Factory"/);
+  assert.match(usd, /assetPath = "assets\/machines\/prep.step"/);
+  assert.deepEqual(omniverseFiles.map((file) => file.path), ['factory.usda', 'materials.usda', 'manifest.json', 'README.md']);
   assert.match(toml, /\[envelope\]/);
   assert.match(toml, /\[\[renderEngines\]\]/);
   assert.match(toml, /\[\[renderViews\]\]/);
