@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { extname, join, normalize } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createProjectApi, readRequestJson } from './project-api.mjs';
 
 const root = process.cwd();
@@ -24,7 +25,7 @@ function jsonResponse(response, status, body) {
   response.end(JSON.stringify(body));
 }
 
-async function handleRenderRequest(request, response) {
+export async function handleRenderRequest(request, response) {
   try {
     const payload = await readRequestJson(request);
     const engineId = String(payload.engineId ?? 'blender-cycles');
@@ -41,7 +42,19 @@ async function handleRenderRequest(request, response) {
       '--execute', payload.execute === false ? 'false' : 'true',
     ], { cwd: root, encoding: 'utf8' });
 
-    const resultBody = JSON.parse(await readFile(join(root, out, 'result.json'), 'utf8'));
+    let resultBody;
+    try {
+      resultBody = JSON.parse(await readFile(join(root, out, 'result.json'), 'utf8'));
+    } catch (error) {
+      const details = [result.stderr, result.stdout].filter(Boolean).join('\n').trim();
+      jsonResponse(response, 500, {
+        error: `Render worker did not produce a JSON result for ${engineId}: ${details || error.message}`,
+        stdout: result.stdout,
+        stderr: result.stderr,
+      });
+      return;
+    }
+
     jsonResponse(response, result.status === 0 ? 200 : 202, {
       ...resultBody,
       stdout: result.stdout,
@@ -52,32 +65,38 @@ async function handleRenderRequest(request, response) {
   }
 }
 
-createServer(async (request, response) => {
-  const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
-  if (await handleProjectsRequest(request, response, url)) return;
+export function createMicrofactoryServer() {
+  return createServer(async (request, response) => {
+    const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
+    if (await handleProjectsRequest(request, response, url)) return;
 
-  if (url.pathname === '/api/render' && request.method === 'POST') {
-    await handleRenderRequest(request, response);
-    return;
-  }
+    if (url.pathname === '/api/render' && request.method === 'POST') {
+      await handleRenderRequest(request, response);
+      return;
+    }
 
-  const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
-  const file = normalize(join(root, pathname));
+    const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
+    const file = normalize(join(root, pathname));
 
-  if (!file.startsWith(root)) {
-    response.writeHead(403);
-    response.end('Forbidden');
-    return;
-  }
+    if (!file.startsWith(root)) {
+      response.writeHead(403);
+      response.end('Forbidden');
+      return;
+    }
 
-  try {
-    const body = await readFile(file);
-    response.writeHead(200, { 'content-type': types.get(extname(file)) ?? 'application/octet-stream' });
-    response.end(body);
-  } catch {
-    response.writeHead(404);
-    response.end('Not found');
-  }
-}).listen(port, () => {
-  console.log(`Microfactory Studio available at http://localhost:${port}`);
-});
+    try {
+      const body = await readFile(file);
+      response.writeHead(200, { 'content-type': types.get(extname(file)) ?? 'application/octet-stream' });
+      response.end(body);
+    } catch {
+      response.writeHead(404);
+      response.end('Not found');
+    }
+  });
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  createMicrofactoryServer().listen(port, () => {
+    console.log(`Microfactory Studio available at http://localhost:${port}`);
+  });
+}

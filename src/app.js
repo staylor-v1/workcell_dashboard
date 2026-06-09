@@ -1197,7 +1197,7 @@ async function startRenderJob(engine, resolution) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ engineId: engine.id, resolution, execute: true }),
   });
-  const result = await response.json();
+  const result = await readJsonResponse(response, 'Render job failed');
   if (!response.ok) throw new Error(result.error ?? 'Render job failed');
   return result;
 }

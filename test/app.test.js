@@ -10,6 +10,7 @@ import { appState, envelopeCadSvg, flowGraph, layoutSvg, renderEnvelope, renderE
 import { parseToml } from '../src/toml.js';
 import { projectStateFromToml, projectTomlFromState, slugifyProjectName } from '../src/projects.js';
 import { createProjectApi } from '../project-api.mjs';
+import { createMicrofactoryServer } from '../server.mjs';
 
 test('factory design contains required coordinated views loaded from TOML source files', () => {
   assert.deepEqual(tabs.map((tab) => tab.id), ['projects', 'summary', 'machines', 'layout', 'envelope', 'flow', 'renders', 'export']);
@@ -108,6 +109,32 @@ test('project API creates TOML projects with JSON responses', async () => {
     assert.equal(response.status, 201);
     assert.equal(result.id, 'api-smoke-project');
     assert.match(saved, /name = "API Smoke Project"/);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+
+test('render API returns JSON job metadata for every render engine', async () => {
+  const server = createMicrofactoryServer().listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  const { port } = server.address();
+
+  try {
+    for (const engine of factoryDesign.renderEngines) {
+      const response = await fetch(`http://127.0.0.1:${port}/api/render`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ engineId: engine.id, resolution: { width: 320, height: 180 }, execute: false }),
+      });
+      const result = await readJsonResponse(response, 'Render job failed');
+
+      assert.equal(response.status, 200);
+      assert.equal(result.engineId, engine.id);
+      assert.equal(result.outputs.length, factoryDesign.renderViews.length);
+      assert.equal(result.executed.length, 0);
+      assert.match(result.scene, /scene\.json$/);
+    }
   } finally {
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
