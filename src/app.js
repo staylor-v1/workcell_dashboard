@@ -1012,7 +1012,7 @@ function renderTroubleshootingHelp(engine) {
   const executable = executableByEngine[engine.id] ?? 'renderer';
   const envVar = envByEngine[engine.id] ?? 'MICROFACTORY_RENDERER_BIN';
   const rendererSetup = engine.id === 'mitsuba-3'
-    ? `For real PNG renders, the dev/server process must be able to run <code>${executable}</code> or import the Mitsuba Python module. Install one of those, set <code>${envVar}</code> or <code>MICROFACTORY_PYTHON_BIN</code> if needed, then restart <code>npm run dev</code>.`
+    ? `For real PNG renders, the dev/server process must be able to run <code>${executable}</code> or import the Mitsuba Python module. Pip-installed <code>mitsuba</code> launchers are supported by using the launcher's Python interpreter directly; set <code>${envVar}</code> or <code>MICROFACTORY_PYTHON_BIN</code> if needed, then restart <code>npm run dev</code>.`
     : `For real PNG renders, the dev/server process must be able to run <code>${executable}</code>. Install it, or set <code>${envVar}</code> to the full executable path, then restart <code>npm run dev</code>.`;
   const renderCommand = `npm run render -- --engine ${engine.id} --resolution 2k --execute true`;
   return `

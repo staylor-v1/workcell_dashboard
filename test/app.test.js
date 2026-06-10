@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { configSourceFiles, designToml, factoryDesign, factoryStep, designMetrics, getRenderEngine, getRenderResolution, omniversePackageFiles, omniverseUsd, renderBoardSvg, renderJobManifest, renderPrompt, renderViewPlan, reportPdf } from '../src/data.js';
@@ -294,6 +294,60 @@ exit 0
   }
 });
 
+
+
+test('Mitsuba render worker uses the Python from a pip-installed mitsuba launcher', async () => {
+  const fakeBinDir = await mkdtemp(join(tmpdir(), 'workcell-fake-mitsuba-launcher-'));
+  const fakePython = join(fakeBinDir, 'python-with-mitsuba');
+  const fakeMitsuba = join(fakeBinDir, 'mitsuba');
+  const out = await mkdtemp(join(tmpdir(), 'workcell-mitsuba-launcher-render-'));
+  await writeFile(fakePython, `#!/bin/sh
+if [ "$1" = "-c" ]; then
+  exit 0
+fi
+mkdir -p "$(dirname "$3")"
+printf 'fake launcher png bytes' > "$3"
+`);
+  await chmod(fakePython, 0o755);
+  await writeFile(fakeMitsuba, `#!${fakePython}
+# launcher body is intentionally unused; the worker should run the shebang Python directly.
+`);
+  await chmod(fakeMitsuba, 0o755);
+  const previousPath = process.env.PATH;
+  const previousPythonBin = process.env.MICROFACTORY_PYTHON_BIN;
+  const previousMitsubaBin = process.env.MICROFACTORY_MITSUBA_BIN;
+  process.env.PATH = `${fakeBinDir}${delimiter}${previousPath ?? ''}`;
+  delete process.env.MICROFACTORY_PYTHON_BIN;
+  delete process.env.MICROFACTORY_MITSUBA_BIN;
+
+  try {
+    const result = spawnSync('node', ['scripts/render-factory.mjs', '--engine', 'mitsuba-3', '--width', '88', '--height', '66', '--out', out, '--execute', 'true'], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+
+    const resultBody = JSON.parse(await readFile(join(out, 'result.json'), 'utf8'));
+    assert.equal(resultBody.resolvedExecutable, fakeMitsuba);
+    assert.ok(resultBody.mitsubaPythonCandidates.includes(fakePython));
+    assert.equal(resultBody.resolvedMitsubaPythonExecutable, fakePython);
+    assert.equal(resultBody.mitsubaPythonImportable, true);
+    assert.deepEqual(resultBody.missingOutputs, []);
+    assert.equal(resultBody.executed.length, factoryDesign.renderViews.length);
+    for (const executed of resultBody.executed) {
+      assert.equal(executed.command, fakePython);
+      assert.equal(executed.args[0], join(out, 'mitsuba_python_render.py'));
+    }
+    for (const renderView of factoryDesign.renderViews) {
+      assert.equal(await readFile(join(out, renderView.output), 'utf8'), 'fake launcher png bytes');
+    }
+  } finally {
+    process.env.PATH = previousPath;
+    if (previousPythonBin === undefined) delete process.env.MICROFACTORY_PYTHON_BIN;
+    else process.env.MICROFACTORY_PYTHON_BIN = previousPythonBin;
+    if (previousMitsubaBin === undefined) delete process.env.MICROFACTORY_MITSUBA_BIN;
+    else process.env.MICROFACTORY_MITSUBA_BIN = previousMitsubaBin;
+    await rm(out, { recursive: true, force: true });
+    await rm(fakeBinDir, { recursive: true, force: true });
+  }
+});
 
 test('Mitsuba render worker falls back to the Mitsuba CLI when Python cannot import Mitsuba', async () => {
   const fakeBinDir = await mkdtemp(join(tmpdir(), 'workcell-fake-mitsuba-cli-'));
