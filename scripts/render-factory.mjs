@@ -1,5 +1,5 @@
-import { access, mkdir, writeFile } from 'node:fs/promises';
-import { accessSync, constants, existsSync } from 'node:fs';
+import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
+import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -162,6 +162,44 @@ function pythonCanImportMitsuba(command, env = process.env) {
   return probe.status === 0;
 }
 
+function shebangPythonExecutable(command) {
+  if (!command) return null;
+  try {
+    const firstLine = readFileSync(command, 'utf8').split(/\r?\n/, 1)[0] ?? '';
+    if (!firstLine.startsWith('#!') || !/python(?:\d+(?:\.\d+)?)?/i.test(firstLine)) return null;
+    const parts = firstLine.slice(2).trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return null;
+    if (parts[0].endsWith('/env')) {
+      const pythonName = parts.find((part) => /^python(?:\d+(?:\.\d+)?)?$/i.test(part));
+      return pythonName ?? null;
+    }
+    return parts[0];
+  } catch {
+    return null;
+  }
+}
+
+function uniqueValues(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function mitsubaPythonExecutableCandidates(resolvedMitsubaExecutable, env = process.env) {
+  const configuredPython = env.MICROFACTORY_PYTHON_BIN ? pythonExecutable(env) : null;
+  return uniqueValues([
+    configuredPython,
+    shebangPythonExecutable(resolvedMitsubaExecutable),
+    pythonExecutable(env),
+  ]);
+}
+
+function findImportableMitsubaPython(candidates, env = process.env) {
+  for (const candidate of candidates) {
+    const resolvedCandidate = resolveExecutable(candidate, { env });
+    if (resolvedCandidate && pythonCanImportMitsuba(resolvedCandidate, env)) return resolvedCandidate;
+  }
+  return null;
+}
+
 function mitsubaPythonDriver() {
   return `import glob
 import os
@@ -267,9 +305,9 @@ async function main() {
   const executable = executableForEngine();
   const resolvedExecutable = resolveExecutable(executable);
   const mitsubaPythonExecutable = engine.id === 'mitsuba-3' ? pythonExecutable() : null;
-  const candidateMitsubaPythonExecutable = mitsubaPythonExecutable ? resolveExecutable(mitsubaPythonExecutable) : null;
-  const mitsubaPythonImportable = Boolean(candidateMitsubaPythonExecutable && pythonCanImportMitsuba(candidateMitsubaPythonExecutable));
-  const resolvedMitsubaPythonExecutable = mitsubaPythonImportable ? candidateMitsubaPythonExecutable : null;
+  const mitsubaPythonCandidates = engine.id === 'mitsuba-3' ? mitsubaPythonExecutableCandidates(resolvedExecutable) : [];
+  const resolvedMitsubaPythonExecutable = engine.id === 'mitsuba-3' ? findImportableMitsubaPython(mitsubaPythonCandidates) : null;
+  const mitsubaPythonImportable = Boolean(resolvedMitsubaPythonExecutable);
   const rendererAvailable = engine.id === 'mitsuba-3' ? Boolean(resolvedExecutable || resolvedMitsubaPythonExecutable) : Boolean(resolvedExecutable);
   const outputs = scene.views.map((view) => join(outDir, view.output));
   const commands = engine.id === 'blender-cycles'
@@ -279,6 +317,16 @@ async function main() {
       : resolvedMitsubaPythonExecutable
         ? scene.views.map((view) => [resolvedMitsubaPythonExecutable, [join(outDir, 'mitsuba_python_render.py'), join(outDir, `${view.id}.xml`), join(outDir, view.output)]])
         : scene.views.map((view) => [resolvedExecutable ?? executable, ['-m', 'scalar_rgb', '-o', join(outDir, view.output), join(outDir, `${view.id}.xml`)]]);
+
+  if (execute && rendererAvailable) {
+    for (const output of outputs) {
+      try {
+        await unlink(output);
+      } catch {
+        // Ignore missing prior outputs so failed renders cannot be masked by stale PNGs.
+      }
+    }
+  }
 
   const executed = [];
   if (execute && rendererAvailable) {
@@ -301,7 +349,7 @@ async function main() {
     if (missingOutputs.length) process.exitCode = process.exitCode || 1;
   }
 
-  const result = { engineId: engine.id, samples: renderSamples, executable, resolvedExecutable, rendererAvailable, executableEnvVar: executableEnvVarName(), mitsubaPythonExecutable, resolvedMitsubaPythonExecutable, mitsubaPythonImportable, executed, jobDir: outDir, outputs, missingOutputs, scene: join(outDir, 'scene.json') };
+  const result = { engineId: engine.id, samples: renderSamples, executable, resolvedExecutable, rendererAvailable, executableEnvVar: executableEnvVarName(), mitsubaPythonExecutable, mitsubaPythonCandidates, resolvedMitsubaPythonExecutable, mitsubaPythonImportable, executed, jobDir: outDir, outputs, missingOutputs, scene: join(outDir, 'scene.json') };
   await writeFile(join(outDir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
   console.log(JSON.stringify(result, null, 2));
 }
