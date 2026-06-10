@@ -30,7 +30,11 @@ test('factory design contains required coordinated views loaded from TOML source
   assert.equal(factoryDesign.machines[0].footprint.x, 1.2);
   assert.deepEqual(factoryDesign.machines[0].parameters[0], ['Dryer temp', '74 °C']);
   assert.equal(factoryDesign.flow.length, 5);
-  assert.equal(factoryDesign.machineCatalog.length, 10);
+  assert.equal(factoryDesign.machineCatalog.length, 11);
+  const hb400 = factoryDesign.machineCatalog.find((machine) => machine.id === 'molycut-hb400');
+  assert.equal(hb400?.name, 'Moly Cut EDM HB 400');
+  assert.equal(hb400?.category, 'Wire EDM');
+  assert.equal(hb400?.assetPath, 'assets/machines/molycut-hb400.step');
   assert.equal(factoryDesign.envelopeOptions.length, 6);
   assert.deepEqual(factoryDesign.renderEngines.map((engine) => engine.name), ['Blender Cycles', 'LuxCoreRender', 'Mitsuba 3']);
   assert.deepEqual(factoryDesign.renderViews.map((view) => view.id), ['top-down', 'container-door', 'orthographic']);
@@ -762,7 +766,7 @@ test('renderer executable discovery honors direct PATH lookup and Windows PATHEX
 
 test('machine STEP assets exist for every layout-available machine and render script writes deterministic scenes', async () => {
   const machines = [...factoryDesign.machines, ...factoryDesign.machineCatalog];
-  assert.equal(machines.length, 15);
+  assert.equal(machines.length, 16);
 
   for (const machine of machines) {
     const step = await readFile(machine.assetPath, 'utf8');
@@ -784,7 +788,7 @@ test('machine STEP assets exist for every layout-available machine and render sc
   assert.equal(scene.resolution.height, 777);
   assert.equal(scene.engine.samples, 4);
   assert.equal(scene.assets.length, machines.length);
-  assert.match(manifest, /Assets: 15 STEP files/);
+  assert.match(manifest, /Assets: 16 STEP files/);
   assert.match(mitsubaScene, /<scene version="3.0.0">/);
   assert.match(mitsubaScene, /<scale x="28" y="28"\/>/);
   assert.match(mitsubaScene, /sample_count" value="4"/);

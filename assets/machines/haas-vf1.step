@@ -20,7 +20,7 @@ DATA;
 #15=PROPERTY_DEFINITION('dimension_source','Haas VF-1 specs: https://www.haascnc.com/machines/vertical-mills/vf-series/models/small/vf-1.html',#6);
 #16=PROPERTY_DEFINITION('cad_source','Haas VF-1 3D Model ZIP: https://www.haascnc.com/machines/vertical-mills/vf-series/models/small/vf-1.html',#6);
 #17=PROPERTY_DEFINITION('asset_note','Deterministic STEP proxy scaled to Haas layout drawing envelope; Haas publishes a 3D Model ZIP but notes it may not match the latest production model, so it is not bundled.',#6);
-#13=SHAPE_REPRESENTATION('machine_14_proxy_envelope',(),#14);
+#13=SHAPE_REPRESENTATION('machine_15_proxy_envelope',(),#14);
 #14=GEOMETRIC_REPRESENTATION_CONTEXT(3);
 ENDSEC;
 END-ISO-10303-21;

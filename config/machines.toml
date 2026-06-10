@@ -270,6 +270,31 @@ w = 1.950
 h = 2.300
 
 [[machine_catalog]]
+id = "molycut-hb400"
+name = "Moly Cut EDM HB 400"
+modelNumber = "HB 400"
+type = "Wire EDM · Molybdenum wire"
+category = "Wire EDM"
+status = "Candidate"
+operator = "EDM machinist"
+cycleTime = 3600
+uptime = 94
+energy = 1.2
+inputs = ["Conductive stock", "Molybdenum wire", "Dielectric water"]
+outputs = ["Precision wire-cut metal parts"]
+buildVolume = "400 × 300 × 300 mm work envelope"
+researchNote = "Compact molybdenum-wire EDM with 400 × 300 mm travel and a 300 mm maximum workpiece thickness."
+sourceLabel = "Moly Cut EDM HB 400 specs"
+sourceUrl = "https://www.molycutedm.com/hb-400/"
+parameters = [{ label = "Travel", value = "400 × 300 mm" }, { label = "Max workpiece thickness", value = "300 mm" }, { label = "Machine footprint", value = "1.640 × 1.650 m" }]
+cadSourceLabel = "No public OEM CAD found; app proxy uses Moly Cut documented machine dimensions"
+cadSourceUrl = "https://www.molycutedm.com/hb-400/"
+assetNote = "Deterministic STEP proxy scaled to documented Moly Cut HB 400 dimensions because no redistributable OEM CAD model was found."
+[machine_catalog.footprint]
+w = 1.640
+h = 1.650
+
+[[machine_catalog]]
 id = "brother-s300x2"
 name = "Brother SPEEDIO S300X2"
 modelNumber = "S300X2"
