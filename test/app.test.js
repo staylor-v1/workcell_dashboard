@@ -173,6 +173,22 @@ test('render option cards stay brief with only renderer names and reference link
   assert.doesNotMatch(picker, /render-engine-card__top|render-specs|render-settings-list|spp/);
 });
 
+
+test('renders tab explains renderer setup without requiring another app rebuild', () => {
+  const previousState = { ...appState, selectedRenderEngineId: appState.selectedRenderEngineId, renderStatus: appState.renderStatus };
+  Object.assign(appState, { selectedRenderEngineId: 'blender-cycles', renderStatus: '' });
+
+  const markup = renderRenders();
+
+  assert.match(markup, /No extra app rebuild is required/);
+  assert.match(markup, /npm run build<\/code> only for production static assets/);
+  assert.match(markup, /<code>blender<\/code>/);
+  assert.match(markup, /<code>MICROFACTORY_BLENDER_BIN<\/code>/);
+  assert.match(markup, /<code>npm run render -- --engine blender-cycles --resolution 2k --execute true<\/code>/);
+
+  Object.assign(appState, previousState);
+});
+
 test('render view panels show their corresponding completed images instead of planning text', () => {
   const previousState = { ...appState, renderImages: [...appState.renderImages], fullscreenRenderImageIndex: appState.fullscreenRenderImageIndex };
   Object.assign(appState, {

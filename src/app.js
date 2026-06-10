@@ -998,6 +998,32 @@ function renderViewCard(view, engine, resolution, index) {
           </article>`;
 }
 
+function renderTroubleshootingHelp(engine) {
+  const executableByEngine = {
+    'blender-cycles': 'blender',
+    luxcore: 'luxcoreconsole',
+    'mitsuba-3': 'mitsuba',
+  };
+  const envByEngine = {
+    'blender-cycles': 'MICROFACTORY_BLENDER_BIN',
+    luxcore: 'MICROFACTORY_LUXCORE_BIN',
+    'mitsuba-3': 'MICROFACTORY_MITSUBA_BIN',
+  };
+  const executable = executableByEngine[engine.id] ?? 'renderer';
+  const envVar = envByEngine[engine.id] ?? 'MICROFACTORY_RENDERER_BIN';
+  const rendererSetup = engine.id === 'mitsuba-3'
+    ? `For real PNG renders, the dev/server process must be able to run <code>${executable}</code> or import the Mitsuba Python module. Install one of those, set <code>${envVar}</code> or <code>MICROFACTORY_PYTHON_BIN</code> if needed, then restart <code>npm run dev</code>.`
+    : `For real PNG renders, the dev/server process must be able to run <code>${executable}</code>. Install it, or set <code>${envVar}</code> to the full executable path, then restart <code>npm run dev</code>.`;
+  const renderCommand = `npm run render -- --engine ${engine.id} --resolution 2k --execute true`;
+  return `
+    <aside class="render-troubleshooting" aria-label="Render troubleshooting">
+      <strong>No extra app rebuild is required.</strong>
+      <span>The Render button calls the server-side worker directly; use <code>npm run build</code> only for production static assets.</span>
+      <span>${rendererSetup}</span>
+      <span>CLI smoke test: <code>${renderCommand}</code></span>
+    </aside>`;
+}
+
 function renderImageGallery() {
   const images = appState.renderImages ?? [];
   if (!images.length) return '';
@@ -1055,6 +1081,7 @@ function renderRenders() {
         </div>
         <button data-render-selected-engine="${engine.id}">${engine.render_button}</button>
         ${appState.renderStatus ? `<strong class="render-status">${appState.renderStatus}</strong>` : ''}
+        ${renderTroubleshootingHelp(engine)}
       </section>
       <div class="render-view-grid">
         ${factoryDesign.renderViews.map((renderView, index) => renderViewCard(renderView, engine, resolution, index)).join('')}
@@ -1397,8 +1424,8 @@ export function bindApp(root = document.querySelector('#root')) {
           appState.renderStatus = appState.renderImages.length
             ? `${engine.name} render complete: ${appState.renderImages.length} output images ready.`
             : job.rendererAvailable
-              ? `${engine.name} render complete: ${job.outputs.join(', ')}`
-              : `${engine.name} scene generated at ${job.jobDir}; ${job.executable} was not found on the server PATH. Install ${job.executable} or set ${job.executableEnvVar} to its full executable path, then restart the server.`;
+              ? `${engine.name} render worker finished without review images. Check ${job.jobDir}/result.json for renderer output and missing files.`
+              : `${engine.name} scene files were generated at ${job.jobDir}, but no PNGs were rendered because ${job.executable} was not found on the dev/server PATH. No app rebuild is needed; install ${job.executable} or set ${job.executableEnvVar} to its full executable path, then restart npm run dev or npm run server.`;
           renderApp(root);
         })
         .catch((error) => {
