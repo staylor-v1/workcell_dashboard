@@ -234,6 +234,64 @@ test('render API fails when a renderer reports success but writes none of the ex
   }
 });
 
+test('Mitsuba render worker uses the Python driver and records completed output images', async () => {
+  const fakeBinDir = await mkdtemp(join(tmpdir(), 'workcell-fake-mitsuba-python-'));
+  const fakePython = join(fakeBinDir, 'python3');
+  const out = await mkdtemp(join(tmpdir(), 'workcell-mitsuba-render-'));
+  await writeFile(fakePython, `#!/bin/sh
+script="$1"
+scene="$2"
+out="$3"
+if [ "$(basename "$script")" != "mitsuba_python_render.py" ]; then
+  echo "unexpected Mitsuba driver script: $script" >&2
+  exit 42
+fi
+case "$scene" in
+  *.xml) ;;
+  *)
+  echo "expected an XML scene path" >&2
+  exit 43
+  ;;
+esac
+if [ -z "$out" ]; then
+  echo "missing output path" >&2
+  exit 44
+fi
+mkdir -p "$(dirname "$out")"
+printf 'fake png bytes' > "$out"
+`);
+  await chmod(fakePython, 0o755);
+  const previousPythonBin = process.env.MICROFACTORY_PYTHON_BIN;
+  process.env.MICROFACTORY_PYTHON_BIN = fakePython;
+
+  try {
+    const result = spawnSync('node', ['scripts/render-factory.mjs', '--engine', 'mitsuba-3', '--width', '77', '--height', '55', '--out', out, '--execute', 'true'], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+
+    const resultBody = JSON.parse(await readFile(join(out, 'result.json'), 'utf8'));
+    const driver = await readFile(join(out, 'mitsuba_python_render.py'), 'utf8');
+    assert.equal(resultBody.engineId, 'mitsuba-3');
+    assert.equal(resultBody.resolvedMitsubaPythonExecutable, fakePython);
+    assert.deepEqual(resultBody.missingOutputs, []);
+    assert.match(driver, /mi\.util\.write_bitmap\(output_path, image\)/);
+    assert.equal(resultBody.executed.length, factoryDesign.renderViews.length);
+    for (const executed of resultBody.executed) {
+      assert.equal(executed.command, fakePython);
+      assert.equal(executed.args[0], join(out, 'mitsuba_python_render.py'));
+      assert.match(executed.args[1], /\.xml$/);
+      assert.notEqual(executed.args[0], 'render');
+    }
+    for (const renderView of factoryDesign.renderViews) {
+      assert.equal(await readFile(join(out, renderView.output), 'utf8'), 'fake png bytes');
+    }
+  } finally {
+    if (previousPythonBin === undefined) delete process.env.MICROFACTORY_PYTHON_BIN;
+    else process.env.MICROFACTORY_PYTHON_BIN = previousPythonBin;
+    await rm(out, { recursive: true, force: true });
+    await rm(fakeBinDir, { recursive: true, force: true });
+  }
+});
+
 test('render API returns JSON job metadata for every render engine', async () => {
   const server = createMicrofactoryServer().listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
