@@ -936,15 +936,7 @@ function renderEngineCard(engine) {
   const selected = engine.id === appState.selectedRenderEngineId;
   return `
     <article class="render-engine-card ${selected ? 'selected' : ''}" data-render-engine-id="${engine.id}">
-      <div class="render-engine-card__top"><span>${engine.quality}</span><strong>${engine.samples} spp</strong></div>
       <h3>${engine.name}</h3>
-      <p>${engine.integrator}</p>
-      <dl class="render-specs compact">
-        <div><dt>Engine</dt><dd>${engine.engine}</dd></div>
-        <div><dt>Resolution</dt><dd>${engine.resolution}</dd></div>
-        <div><dt>Color/output</dt><dd>${engine.color}</dd></div>
-      </dl>
-      <ul class="render-settings-list">${engine.settings.map((setting) => `<li>${setting}</li>`).join('')}</ul>
       <a href="${engine.source_url}" target="_blank" rel="noreferrer">${engine.source_label}</a>
     </article>`;
 }
@@ -981,6 +973,29 @@ function renderResolutionModal() {
 
 function renderOutputLabel(image, index) {
   return image.label ?? image.viewTitle ?? image.output ?? `Render output ${index + 1}`;
+}
+
+function renderImageForView(view) {
+  return (appState.renderImages ?? []).find((image) => image.viewId === view.id || image.output === view.output) ?? null;
+}
+
+function renderViewCard(view, engine, resolution, index) {
+  const image = renderImageForView(view);
+  if (image) {
+    const imageIndex = (appState.renderImages ?? []).indexOf(image);
+    return `
+          <article class="render-view-card has-render-image" aria-label="${view.title} rendered image panel">
+            <button class="render-view-image-button" type="button" data-render-image-index="${imageIndex}" aria-label="Open ${renderOutputLabel(image, index)} fullscreen">
+              <img src="${image.url}" alt="${renderOutputLabel(image, index)}" loading="lazy" />
+            </button>
+          </article>`;
+  }
+  return `
+          <article class="render-view-card">
+            <span>${view.title}</span>
+            <h3>${view.output}</h3>
+            <p>${renderViewPlan(engine, view, factoryDesign, resolution)}</p>
+          </article>`;
 }
 
 function renderImageGallery() {
@@ -1042,12 +1057,7 @@ function renderRenders() {
         ${appState.renderStatus ? `<strong class="render-status">${appState.renderStatus}</strong>` : ''}
       </section>
       <div class="render-view-grid">
-        ${factoryDesign.renderViews.map((view) => `
-          <article class="render-view-card">
-            <span>${view.title}</span>
-            <h3>${view.output}</h3>
-            <p>${renderViewPlan(engine, view, factoryDesign, resolution)}</p>
-          </article>`).join('')}
+        ${factoryDesign.renderViews.map((renderView, index) => renderViewCard(renderView, engine, resolution, index)).join('')}
       </div>
       ${renderImageGallery()}
       <label class="prompt-label" for="render-job-manifest">One-click render job manifest</label>

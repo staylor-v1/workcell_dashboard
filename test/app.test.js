@@ -162,6 +162,78 @@ test('project API creates TOML projects with JSON responses', async () => {
 });
 
 
+test('render option cards stay brief with only renderer names and reference links', () => {
+  const markup = renderRenders();
+  const picker = markup.match(/<section class="render-engine-picker"[\s\S]*?<\/section>/)?.[0] ?? '';
+
+  for (const engine of factoryDesign.renderEngines) {
+    assert.match(picker, new RegExp(`<h3>${engine.name}</h3>`));
+    assert.match(picker, new RegExp(`href="${engine.source_url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
+  }
+  assert.doesNotMatch(picker, /render-engine-card__top|render-specs|render-settings-list|spp/);
+});
+
+test('render view panels show their corresponding completed images instead of planning text', () => {
+  const previousState = { ...appState, renderImages: [...appState.renderImages], fullscreenRenderImageIndex: appState.fullscreenRenderImageIndex };
+  Object.assign(appState, {
+    renderImages: factoryDesign.renderViews.map((renderView) => ({
+      viewId: renderView.id,
+      viewTitle: renderView.title,
+      label: `${renderView.title} render`,
+      output: renderView.output,
+      url: `/artifacts/render-jobs/test/${renderView.output}`,
+      path: `artifacts/render-jobs/test/${renderView.output}`,
+    })),
+    fullscreenRenderImageIndex: null,
+  });
+
+  const markup = renderRenders();
+  const grid = markup.match(/<div class="render-view-grid">[\s\S]*?<\/div>\s*<section class="render-output-panel"/)?.[0] ?? '';
+
+  assert.equal((grid.match(/class="render-view-card has-render-image"/g) ?? []).length, factoryDesign.renderViews.length);
+  for (const renderView of factoryDesign.renderViews) {
+    assert.match(grid, new RegExp(`<img src="/artifacts/render-jobs/test/${renderView.output.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
+    assert.doesNotMatch(grid, new RegExp(`<h3>${renderView.output.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</h3>`));
+  }
+  assert.doesNotMatch(grid, /render-view-card">[\s\S]*?<p>/);
+
+  Object.assign(appState, previousState);
+});
+
+test('render API fails when a renderer reports success but writes none of the expected images', async () => {
+  const fakeBinDir = await mkdtemp(join(tmpdir(), 'workcell-fake-renderer-'));
+  const fakeBlender = join(fakeBinDir, 'fake-blender');
+  const artifactDir = 'artifacts/render-jobs/blender-cycles-111x99';
+  await writeFile(fakeBlender, '#!/bin/sh\nexit 0\n');
+  await chmod(fakeBlender, 0o755);
+  await rm(artifactDir, { recursive: true, force: true });
+  const previousBlenderBin = process.env.MICROFACTORY_BLENDER_BIN;
+  process.env.MICROFACTORY_BLENDER_BIN = fakeBlender;
+  const server = createMicrofactoryServer().listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  const { port } = server.address();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/render`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ engineId: 'blender-cycles', resolution: { width: 111, height: 99 }, execute: true }),
+    });
+    const result = await readJsonResponse(response, 'Render job failed');
+
+    assert.equal(response.status, 500);
+    assert.match(result.error, /finished without writing expected image files/);
+    assert.equal(result.missingOutputs.length, factoryDesign.renderViews.length);
+    assert.deepEqual(result.outputImages, []);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    if (previousBlenderBin === undefined) delete process.env.MICROFACTORY_BLENDER_BIN;
+    else process.env.MICROFACTORY_BLENDER_BIN = previousBlenderBin;
+    await rm(artifactDir, { recursive: true, force: true });
+    await rm(fakeBinDir, { recursive: true, force: true });
+  }
+});
+
 test('render API returns JSON job metadata for every render engine', async () => {
   const server = createMicrofactoryServer().listen(0);
   await new Promise((resolve) => server.once('listening', resolve));

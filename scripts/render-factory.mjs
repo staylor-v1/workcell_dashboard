@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, writeFile } from 'node:fs/promises';
 import { accessSync, constants, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { delimiter, join } from 'node:path';
@@ -242,7 +242,19 @@ async function main() {
     }
   }
 
-  const result = { engineId: engine.id, executable, resolvedExecutable, rendererAvailable, executableEnvVar: executableEnvVarName(), executed, jobDir: outDir, outputs, scene: join(outDir, 'scene.json') };
+  const missingOutputs = [];
+  if (execute && rendererAvailable) {
+    for (const output of outputs) {
+      try {
+        await access(output);
+      } catch {
+        missingOutputs.push(output);
+      }
+    }
+    if (missingOutputs.length) process.exitCode = process.exitCode || 1;
+  }
+
+  const result = { engineId: engine.id, executable, resolvedExecutable, rendererAvailable, executableEnvVar: executableEnvVarName(), executed, jobDir: outDir, outputs, missingOutputs, scene: join(outDir, 'scene.json') };
   await writeFile(join(outDir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
   console.log(JSON.stringify(result, null, 2));
 }
