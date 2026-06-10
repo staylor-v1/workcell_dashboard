@@ -150,6 +150,39 @@ function luxCoreCfg(view) {
   return `scene.file = ${join(outDir, `${view.id}.scn`)}\nrenderengine.type = PATHCPU\nsampler.type = SOBOL\npath.pathdepth.total = 12\npath.russianroulette.depth = 5\nbatch.haltspp = ${engine.samples}\nfilm.width = ${resolution.width}\nfilm.height = ${resolution.height}\nfilm.outputs.1.type = RGB_IMAGEPIPELINE\nfilm.outputs.1.filename = ${join(outDir, view.output)}\n`;
 }
 
+
+function pythonExecutable(env = process.env) {
+  return env.MICROFACTORY_PYTHON_BIN ?? env.PYTHON ?? 'python3';
+}
+
+function mitsubaPythonDriver() {
+  return `import glob
+import os
+import sys
+
+if 'DRJIT_LIBLLVM_PATH' not in os.environ:
+    for pattern in (
+        '/usr/lib/llvm-*/lib/libLLVM.so',
+        '/usr/lib/llvm-*/lib/libLLVM.so.*',
+        '/usr/lib/x86_64-linux-gnu/libLLVM*.so.*',
+        '/usr/lib/aarch64-linux-gnu/libLLVM*.so.*',
+    ):
+        matches = sorted(glob.glob(pattern), reverse=True)
+        if matches:
+            os.environ['DRJIT_LIBLLVM_PATH'] = matches[0]
+            break
+
+import mitsuba as mi
+
+mi.set_variant('scalar_rgb')
+scene_path = sys.argv[1]
+output_path = sys.argv[2]
+scene = mi.load_file(scene_path)
+image = mi.render(scene)
+mi.util.write_bitmap(output_path, image)
+`;
+}
+
 function executableEnvVarName(engineId = engine.id) {
   if (engineId === 'blender-cycles') return 'MICROFACTORY_BLENDER_BIN';
   if (engineId === 'luxcore') return 'MICROFACTORY_LUXCORE_BIN';
@@ -222,16 +255,21 @@ async function main() {
   await Promise.all(scene.views.map((view) => writeFile(join(outDir, `${view.id}.scn`), luxCoreScene(scene, view))));
   await Promise.all(scene.views.map((view) => writeFile(join(outDir, `${view.id}.cfg`), luxCoreCfg(view))));
   await Promise.all(scene.machines.map((_, index) => writeFile(join(outDir, `machine_${index}.ply`), unitCubePly())));
+  await writeFile(join(outDir, 'mitsuba_python_render.py'), mitsubaPythonDriver());
 
   const executable = executableForEngine();
   const resolvedExecutable = resolveExecutable(executable);
-  const rendererAvailable = Boolean(resolvedExecutable);
+  const mitsubaPythonExecutable = engine.id === 'mitsuba-3' ? pythonExecutable() : null;
+  const resolvedMitsubaPythonExecutable = mitsubaPythonExecutable ? resolveExecutable(mitsubaPythonExecutable) : null;
+  const rendererAvailable = engine.id === 'mitsuba-3' ? Boolean(resolvedExecutable || resolvedMitsubaPythonExecutable) : Boolean(resolvedExecutable);
   const outputs = scene.views.map((view) => join(outDir, view.output));
   const commands = engine.id === 'blender-cycles'
     ? [[resolvedExecutable ?? executable, ['--background', '--python', join(outDir, 'blender_factory_render.py')]]]
     : engine.id === 'luxcore'
       ? scene.views.map((view) => [resolvedExecutable ?? executable, [join(outDir, `${view.id}.cfg`)]])
-      : scene.views.map((view) => [resolvedExecutable ?? executable, ['-m', 'scalar_rgb', '-o', join(outDir, view.output), join(outDir, `${view.id}.xml`)]]);
+      : resolvedMitsubaPythonExecutable
+        ? scene.views.map((view) => [resolvedMitsubaPythonExecutable, [join(outDir, 'mitsuba_python_render.py'), join(outDir, `${view.id}.xml`), join(outDir, view.output)]])
+        : scene.views.map((view) => [resolvedExecutable ?? executable, ['-m', 'scalar_rgb', '-o', join(outDir, view.output), join(outDir, `${view.id}.xml`)]]);
 
   const executed = [];
   if (execute && rendererAvailable) {
@@ -254,7 +292,7 @@ async function main() {
     if (missingOutputs.length) process.exitCode = process.exitCode || 1;
   }
 
-  const result = { engineId: engine.id, executable, resolvedExecutable, rendererAvailable, executableEnvVar: executableEnvVarName(), executed, jobDir: outDir, outputs, missingOutputs, scene: join(outDir, 'scene.json') };
+  const result = { engineId: engine.id, executable, resolvedExecutable, rendererAvailable, executableEnvVar: executableEnvVarName(), mitsubaPythonExecutable, resolvedMitsubaPythonExecutable, executed, jobDir: outDir, outputs, missingOutputs, scene: join(outDir, 'scene.json') };
   await writeFile(join(outDir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
   console.log(JSON.stringify(result, null, 2));
 }
