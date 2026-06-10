@@ -234,11 +234,124 @@ test('render API fails when a renderer reports success but writes none of the ex
   }
 });
 
+
+test('Mitsuba render API reports missing images when the Python driver exits without outputs', async () => {
+  const fakeBinDir = await mkdtemp(join(tmpdir(), 'workcell-fake-empty-mitsuba-python-'));
+  const fakePython = join(fakeBinDir, 'python3');
+  const artifactDir = 'artifacts/render-jobs/mitsuba-3-2048x1152';
+  await writeFile(fakePython, `#!/bin/sh
+if [ "$1" = "-c" ]; then
+  exit 0
+fi
+exit 0
+`);
+  await chmod(fakePython, 0o755);
+  await rm(artifactDir, { recursive: true, force: true });
+  const previousPythonBin = process.env.MICROFACTORY_PYTHON_BIN;
+  const previousMitsubaBin = process.env.MICROFACTORY_MITSUBA_BIN;
+  process.env.MICROFACTORY_PYTHON_BIN = fakePython;
+  process.env.MICROFACTORY_MITSUBA_BIN = join(fakeBinDir, 'missing-mitsuba');
+  const server = createMicrofactoryServer().listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  const { port } = server.address();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/render`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ engineId: 'mitsuba-3', resolution: { width: 2048, height: 1152 }, execute: true }),
+    });
+    const result = await readJsonResponse(response, 'Mitsuba render job failed');
+
+    assert.equal(response.status, 500);
+    assert.match(result.error, /Render worker finished without writing expected image files/);
+    assert.deepEqual(result.missingOutputs, factoryDesign.renderViews.map((renderView) => join(artifactDir, renderView.output)));
+    assert.deepEqual(result.outputImages, []);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    if (previousPythonBin === undefined) delete process.env.MICROFACTORY_PYTHON_BIN;
+    else process.env.MICROFACTORY_PYTHON_BIN = previousPythonBin;
+    if (previousMitsubaBin === undefined) delete process.env.MICROFACTORY_MITSUBA_BIN;
+    else process.env.MICROFACTORY_MITSUBA_BIN = previousMitsubaBin;
+    await rm(artifactDir, { recursive: true, force: true });
+    await rm(fakeBinDir, { recursive: true, force: true });
+  }
+});
+
+
+test('Mitsuba render worker falls back to the Mitsuba CLI when Python cannot import Mitsuba', async () => {
+  const fakeBinDir = await mkdtemp(join(tmpdir(), 'workcell-fake-mitsuba-cli-'));
+  const fakePython = join(fakeBinDir, 'python3');
+  const fakeMitsuba = join(fakeBinDir, 'mitsuba');
+  const out = await mkdtemp(join(tmpdir(), 'workcell-mitsuba-cli-render-'));
+  await writeFile(fakePython, `#!/bin/sh
+if [ "$1" = "-c" ]; then
+  echo "No module named mitsuba" >&2
+  exit 1
+fi
+exit 0
+`);
+  await chmod(fakePython, 0o755);
+  await writeFile(fakeMitsuba, `#!/bin/sh
+out=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then
+    shift
+    out="$1"
+  fi
+  shift
+done
+if [ -z "$out" ]; then
+  echo "missing -o output" >&2
+  exit 45
+fi
+mkdir -p "$(dirname "$out")"
+printf 'fake mitsuba cli png bytes' > "$out"
+`);
+  await chmod(fakeMitsuba, 0o755);
+  const previousPythonBin = process.env.MICROFACTORY_PYTHON_BIN;
+  const previousMitsubaBin = process.env.MICROFACTORY_MITSUBA_BIN;
+  process.env.MICROFACTORY_PYTHON_BIN = fakePython;
+  process.env.MICROFACTORY_MITSUBA_BIN = fakeMitsuba;
+
+  try {
+    const result = spawnSync('node', ['scripts/render-factory.mjs', '--engine', 'mitsuba-3', '--width', '77', '--height', '55', '--out', out, '--execute', 'true'], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+
+    const resultBody = JSON.parse(await readFile(join(out, 'result.json'), 'utf8'));
+    assert.equal(resultBody.engineId, 'mitsuba-3');
+    assert.equal(resultBody.resolvedMitsubaPythonExecutable, null);
+    assert.equal(resultBody.mitsubaPythonImportable, false);
+    assert.equal(resultBody.resolvedExecutable, fakeMitsuba);
+    assert.deepEqual(resultBody.missingOutputs, []);
+    assert.equal(resultBody.executed.length, factoryDesign.renderViews.length);
+    for (const executed of resultBody.executed) {
+      assert.equal(executed.command, fakeMitsuba);
+      assert.deepEqual(executed.args.slice(0, 3), ['-m', 'scalar_rgb', '-o']);
+      assert.match(executed.args[3], /\.png$/);
+      assert.match(executed.args[4], /\.xml$/);
+    }
+    for (const renderView of factoryDesign.renderViews) {
+      assert.equal(await readFile(join(out, renderView.output), 'utf8'), 'fake mitsuba cli png bytes');
+    }
+  } finally {
+    if (previousPythonBin === undefined) delete process.env.MICROFACTORY_PYTHON_BIN;
+    else process.env.MICROFACTORY_PYTHON_BIN = previousPythonBin;
+    if (previousMitsubaBin === undefined) delete process.env.MICROFACTORY_MITSUBA_BIN;
+    else process.env.MICROFACTORY_MITSUBA_BIN = previousMitsubaBin;
+    await rm(out, { recursive: true, force: true });
+    await rm(fakeBinDir, { recursive: true, force: true });
+  }
+});
+
 test('Mitsuba render worker uses the Python driver and records completed output images', async () => {
   const fakeBinDir = await mkdtemp(join(tmpdir(), 'workcell-fake-mitsuba-python-'));
   const fakePython = join(fakeBinDir, 'python3');
   const out = await mkdtemp(join(tmpdir(), 'workcell-mitsuba-render-'));
   await writeFile(fakePython, `#!/bin/sh
+if [ "$1" = "-c" ]; then
+  exit 0
+fi
 script="$1"
 scene="$2"
 out="$3"
@@ -589,7 +702,7 @@ test('machine STEP assets exist for every layout-available machine and render sc
   }
 
   const out = await mkdtemp(join(tmpdir(), 'microfactory-render-'));
-  const result = spawnSync('node', ['scripts/render-factory.mjs', '--engine', 'mitsuba-3', '--width', '1234', '--height', '777', '--out', out], { encoding: 'utf8' });
+  const result = spawnSync('node', ['scripts/render-factory.mjs', '--engine', 'mitsuba-3', '--width', '1234', '--height', '777', '--samples', '4', '--out', out], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
 
   const scene = JSON.parse(await readFile(join(out, 'scene.json'), 'utf8'));
@@ -599,9 +712,13 @@ test('machine STEP assets exist for every layout-available machine and render sc
 
   assert.equal(scene.resolution.width, 1234);
   assert.equal(scene.resolution.height, 777);
+  assert.equal(scene.engine.samples, 4);
   assert.equal(scene.assets.length, machines.length);
   assert.match(manifest, /Assets: 15 STEP files/);
   assert.match(mitsubaScene, /<scene version="3.0.0">/);
-  assert.match(mitsubaScene, /sample_count" value="1024"/);
+  assert.match(mitsubaScene, /<scale x="28" y="28"\/>/);
+  assert.match(mitsubaScene, /sample_count" value="4"/);
+  assert.match(mitsubaScene, /<emitter type="point">/);
+  assert.doesNotMatch(mitsubaScene, /<shape type="rectangle">/);
   assert.match(luxMesh, /element vertex 8/);
 });
