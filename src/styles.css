@@ -188,6 +188,9 @@ body.is-panning-layout .layout-canvas { cursor: grabbing; }
 .render-action-panel h2, .render-action-panel p { margin-bottom: .35rem; }
 .render-action-panel button { border: 0; border-radius: 999px; padding: .9rem 1.2rem; color: #06121f; background: var(--accent); font-weight: 900; box-shadow: 0 14px 38px rgba(62, 231, 198, .24); }
 .render-status { grid-column: 1 / -1; color: var(--accent); }
+.render-troubleshooting { grid-column: 1 / -1; display: grid; gap: .45rem; border: 1px solid rgba(148, 163, 184, .24); border-radius: 18px; padding: .85rem; background: rgba(2, 6, 23, .36); color: var(--muted); line-height: 1.45; }
+.render-troubleshooting strong { color: var(--accent); }
+.render-troubleshooting code { color: var(--text); background: rgba(148, 163, 184, .14); border-radius: 8px; padding: .08rem .32rem; }
 .render-view-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 .render-view-card { border: 1px solid var(--line); border-radius: 24px; padding: 1rem; background: rgba(2, 6, 23, .34); }
 .render-view-card.has-render-image { padding: 0; overflow: hidden; }
