@@ -234,6 +234,63 @@ test('render API fails when a renderer reports success but writes none of the ex
   }
 });
 
+test('Mitsuba render worker invokes the real CLI form and records completed output images', async () => {
+  const fakeBinDir = await mkdtemp(join(tmpdir(), 'workcell-fake-mitsuba-'));
+  const fakeMitsuba = join(fakeBinDir, 'mitsuba');
+  const out = await mkdtemp(join(tmpdir(), 'workcell-mitsuba-render-'));
+  await writeFile(fakeMitsuba, `#!/bin/sh
+out=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "render" ]; then
+    echo "unexpected render subcommand" >&2
+    exit 42
+  fi
+  if [ "$1" = "-m" ] && [ "$2" != "scalar_rgb" ]; then
+    echo "unexpected Mitsuba variant: $2" >&2
+    exit 43
+  fi
+  if [ "$1" = "-o" ]; then
+    out="$2"
+    shift 2
+    continue
+  fi
+  shift
+done
+if [ -z "$out" ]; then
+  echo "missing output path" >&2
+  exit 44
+fi
+mkdir -p "$(dirname "$out")"
+printf 'fake png bytes' > "$out"
+`);
+  await chmod(fakeMitsuba, 0o755);
+  const previousMitsubaBin = process.env.MICROFACTORY_MITSUBA_BIN;
+  process.env.MICROFACTORY_MITSUBA_BIN = fakeMitsuba;
+
+  try {
+    const result = spawnSync('node', ['scripts/render-factory.mjs', '--engine', 'mitsuba-3', '--width', '77', '--height', '55', '--out', out, '--execute', 'true'], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+
+    const resultBody = JSON.parse(await readFile(join(out, 'result.json'), 'utf8'));
+    assert.equal(resultBody.engineId, 'mitsuba-3');
+    assert.deepEqual(resultBody.missingOutputs, []);
+    assert.equal(resultBody.executed.length, factoryDesign.renderViews.length);
+    for (const executed of resultBody.executed) {
+      assert.equal(executed.command, fakeMitsuba);
+      assert.deepEqual(executed.args.slice(0, 4), ['-m', 'scalar_rgb', '-o', executed.args[3]]);
+      assert.notEqual(executed.args[0], 'render');
+    }
+    for (const renderView of factoryDesign.renderViews) {
+      assert.equal(await readFile(join(out, renderView.output), 'utf8'), 'fake png bytes');
+    }
+  } finally {
+    if (previousMitsubaBin === undefined) delete process.env.MICROFACTORY_MITSUBA_BIN;
+    else process.env.MICROFACTORY_MITSUBA_BIN = previousMitsubaBin;
+    await rm(out, { recursive: true, force: true });
+    await rm(fakeBinDir, { recursive: true, force: true });
+  }
+});
+
 test('render API returns JSON job metadata for every render engine', async () => {
   const server = createMicrofactoryServer().listen(0);
   await new Promise((resolve) => server.once('listening', resolve));

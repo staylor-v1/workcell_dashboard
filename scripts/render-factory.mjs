@@ -231,7 +231,7 @@ async function main() {
     ? [[resolvedExecutable ?? executable, ['--background', '--python', join(outDir, 'blender_factory_render.py')]]]
     : engine.id === 'luxcore'
       ? scene.views.map((view) => [resolvedExecutable ?? executable, [join(outDir, `${view.id}.cfg`)]])
-      : scene.views.map((view) => [resolvedExecutable ?? executable, ['render', '-o', join(outDir, view.output), join(outDir, `${view.id}.xml`)]]);
+      : scene.views.map((view) => [resolvedExecutable ?? executable, ['-m', 'scalar_rgb', '-o', join(outDir, view.output), join(outDir, `${view.id}.xml`)]]);
 
   const executed = [];
   if (execute && rendererAvailable) {
