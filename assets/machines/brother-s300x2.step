@@ -20,7 +20,7 @@ DATA;
 #15=PROPERTY_DEFINITION('dimension_source','Brother S300X2 specs: https://machinetool.global.brother/en-us/all-products/sx2/s300x2',#6);
 #16=PROPERTY_DEFINITION('cad_source','No public OEM CAD found; app proxy uses Brother required floor space: https://machinetool.global.brother/en-us/all-products/sx2/s300x2',#6);
 #17=PROPERTY_DEFINITION('asset_note','Deterministic STEP proxy scaled to documented required floor space because no redistributable OEM CAD model was found.',#6);
-#13=SHAPE_REPRESENTATION('machine_13_proxy_envelope',(),#14);
+#13=SHAPE_REPRESENTATION('machine_14_proxy_envelope',(),#14);
 #14=GEOMETRIC_REPRESENTATION_CONTEXT(3);
 ENDSEC;
 END-ISO-10303-21;
