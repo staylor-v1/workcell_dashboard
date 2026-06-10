@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { extname, join, normalize, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createProjectApi, readRequestJson } from './project-api.mjs';
+import { factoryDesign } from './src/data.js';
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 4173);
@@ -47,10 +48,15 @@ async function existingRenderImages(resultBody) {
       continue;
     }
     const relativePath = relative(root, outputPath).split(sep).join('/');
+    const outputName = relativePath.split('/').at(-1);
+    const view = factoryDesign.renderViews.find((renderView) => renderView.output === outputName);
     images.push({
       path: relativePath,
       url: `/${relativePath}`,
-      output: relativePath.split('/').at(-1),
+      output: outputName,
+      viewId: view?.id ?? '',
+      viewTitle: view?.title ?? outputName,
+      label: view ? `${view.title} render` : outputName,
     });
   }
   return images;
@@ -86,11 +92,17 @@ export async function handleRenderRequest(request, response) {
       return;
     }
 
-    jsonResponse(response, result.status === 0 ? 200 : 202, {
+    const outputImages = await existingRenderImages(resultBody);
+    const missingOutputs = Array.isArray(resultBody.missingOutputs) ? resultBody.missingOutputs : [];
+    const renderFailed = result.status !== 0 || missingOutputs.length > 0;
+    jsonResponse(response, renderFailed ? 500 : 200, {
       ...resultBody,
-      outputImages: await existingRenderImages(resultBody),
+      outputImages,
       stdout: result.stdout,
       stderr: result.stderr,
+      ...(renderFailed ? { error: missingOutputs.length
+        ? `Render worker finished without writing expected image files: ${missingOutputs.join(', ')}`
+        : `Render worker failed for ${engineId}` } : {}),
     });
   } catch (error) {
     jsonResponse(response, 500, { error: error.message });
